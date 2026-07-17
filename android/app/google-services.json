@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "984935343154",
+    "project_id": "scholarship-sponser-finder",
+    "storage_bucket": "scholarship-sponser-finder.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:984935343154:android:e56fd0ef02f1d67bb1482b",
+        "android_client_info": {
+          "package_name": "com.example.scholarship_sponser_connect_platform"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "984935343154-l9d1qe5k0ufqstqej37m59lva1jqmu1r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4ddHIjs9nnGHGukP5obdw6kpb7O77FRE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "984935343154-l9d1qe5k0ufqstqej37m59lva1jqmu1r.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "984935343154-m2mjro1ovq76usfh58ggdc0545s6ckfk.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.scholarshipSponserConnectPlatform"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
