@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/custom_button.dart';
+import 'signup_screen.dart';
 
 
 
@@ -113,9 +114,47 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 15),
 
-              CustomButton(
-                text: "Sign In",
-                onPressed: () {},
+              ElevatedButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Sign In Clicked")),
+                  );
+                },
+                child: const Text("Sign IN"),
+              ),
+              const SizedBox(height: 25),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    "Don't have an account?",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => Scaffold(
+                            appBar: AppBar(
+                              title: const Text("Test"),
+                            ),
+                            body: const Center(
+                              child: Text("Navigation Working"),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      "Create Account",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )
+                ],
               ),
 
               // Password Field
