@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/custom_button.dart';
+import '../../services/auth_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -20,6 +21,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController = TextEditingController();
 
+  final AuthService _authService = AuthService();
 
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
@@ -147,7 +149,53 @@ class _SignupScreenState extends State<SignupScreen> {
 
               CustomButton(
                 text: "Create Account",
-                onPressed: () {},
+                onPressed: () async {
+                  if (nameController.text.isEmpty ||
+                      emailController.text.isEmpty ||
+                      mobileController.text.isEmpty ||
+                      collegeController.text.isEmpty ||
+                      passwordController.text.isEmpty ||
+                      confirmPasswordController.text.isEmpty) {
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Please fill all fields"),
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (passwordController.text != confirmPasswordController.text) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Passwords do not match"),
+                      ),
+                    );
+                    return;
+                  }
+
+                  try {
+                    await _authService.signUp(
+                      email: emailController.text.trim(),
+                      password: passwordController.text.trim(),
+                    );
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Account Created Successfully"),
+                      ),
+                    );
+
+                    Navigator.pop(context);
+
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(e.toString()),
+                      ),
+                    );
+                  }
+                },
               ),
 
             ],

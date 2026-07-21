@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../../widgets/custom_textfield.dart';
 import '../../widgets/custom_button.dart';
 import 'signup_screen.dart';
-
-
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../services/auth_service.dart';
+import '../student/student_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,9 +15,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
 
   bool obscurePassword = true;
 
@@ -31,18 +32,15 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(
             horizontal: 25,
             vertical: 20,
           ),
-
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
               const SizedBox(height: 20),
 
               Center(
@@ -74,6 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 35),
 
+              // Email
               CustomTextField(
                 controller: emailController,
                 hintText: "Email Address",
@@ -83,6 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 20),
 
+              // Password
               CustomTextField(
                 controller: passwordController,
                 hintText: "Password",
@@ -107,43 +107,74 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    // Forgot Password (Next Step)
+                  },
                   child: const Text("Forgot Password?"),
                 ),
               ),
 
               const SizedBox(height: 15),
 
-              ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Sign In Clicked")),
-                  );
+              CustomButton(
+                text: "Sign In",
+                onPressed: () async {
+                  try {
+                    print(emailController.text.trim());
+                    print(passwordController.text.trim());
+                    await _authService.signIn(
+                      email: emailController.text.trim(),
+                      password: passwordController.text.trim(),
+                    );
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Login Successful"),
+                      ),
+                    );
+
+                    // Temporary navigation
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const StudentDashboard(
+                        ),
+                      ),
+                    );
+                  } on FirebaseAuthException catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(e.message ?? "Login Failed"),
+                      ),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(e.toString()),
+                      ),
+                    );
+                  }
                 },
-                child: const Text("Sign IN"),
               ),
+
               const SizedBox(height: 25),
 
+              // Create Account
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
                     "Don't have an account?",
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(
+                      color: Colors.grey,
+                    ),
                   ),
                   TextButton(
                     onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => Scaffold(
-                            appBar: AppBar(
-                              title: const Text("Test"),
-                            ),
-                            body: const Center(
-                              child: Text("Navigation Working"),
-                            ),
-                          ),
+                          builder: (context) => const SignupScreen(),
                         ),
                       );
                     },
@@ -153,18 +184,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                  )
+                  ),
                 ],
               ),
-
-              // Password Field
-
-              // Forgot Password
-
-              // Login Button
-
-              // Create Account
-
             ],
           ),
         ),
