@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_text_styles.dart';
+import '../../widgets/app_logo.dart';
 import '../auth/role_selection_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -11,83 +14,171 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+
+  late AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
 
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..forward();
+
     Timer(
-      const Duration(seconds: 3),
+      const Duration(seconds: 4),
           () {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const RoleSelectionScreen(),
+            builder: (_) => const RoleSelectionScreen(),
           ),
         );
       },
     );
   }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
+
       body: Container(
-        width: double.infinity,
+
         decoration: const BoxDecoration(
+
           gradient: LinearGradient(
+
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
+
             colors: [
-              Color(0xFF1E3A8A),
+
+              Color(0xFF2563EB),
+
               Color(0xFF3B82F6),
+
+              Color(0xFF60A5FA),
+
             ],
+
           ),
+
         ),
+
         child: SafeArea(
+
           child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
 
-                Image.asset(
-                  'assets/images/logo.png',
-                  height: 130,
-                ),
+            child: FadeTransition(
 
-                const SizedBox(height: 25),
+              opacity: _controller,
 
-                const Text(
-                  'Scholarship Sponsor Connect',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
+              child: Column(
+
+                mainAxisAlignment: MainAxisAlignment.center,
+
+                children: [
+
+                  const AppLogo(size: 140),
+
+                  const SizedBox(height: 35),
+
+                  const Text(
+
+                    "Scholarship Sponsor",
+
+                    style: AppTextStyles.heading,
+
+                  ),
+
+                  const Text(
+
+                    "Connect Platform",
+
+                    style: AppTextStyles.heading,
+
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  const Text(
+
+                    "Connecting Dreams with Opportunities",
+
+                    textAlign: TextAlign.center,
+
+                    style: TextStyle(
+
+                      color: Colors.white70,
+
+                      fontSize: 16,
+
+                    ),
+
+                  ),
+
+                  const SizedBox(height: 50),
+
+                  const CircularProgressIndicator(
+
                     color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
+
                   ),
-                ),
 
-                const SizedBox(height: 12),
+                  const SizedBox(height: 25),
 
-                const Text(
-                  'Connecting Dreams with Opportunities',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
+                  const Text(
+
+                    "Loading...",
+
+                    style: TextStyle(
+
+                      color: Colors.white,
+
+                      fontSize: 16,
+
+                    ),
+
                   ),
-                ),
 
-                const SizedBox(height: 50),
+                  const SizedBox(height: 80),
 
-                const CircularProgressIndicator(
-                  color: Colors.white,
-                ),
-              ],
+                  const Text(
+
+                    "Version 2.0",
+
+                    style: TextStyle(
+
+                      color: Colors.white70,
+
+                    ),
+
+                  ),
+
+                ],
+
+              ),
+
             ),
+
           ),
+
         ),
+
       ),
+
     );
+
   }
+
 }

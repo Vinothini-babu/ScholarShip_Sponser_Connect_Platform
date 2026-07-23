@@ -1,102 +1,196 @@
 import 'package:flutter/material.dart';
 
-class StudentDashboard extends StatelessWidget {
+import '../../widgets/dashboard_header.dart';
+import '../../widgets/feature_banner.dart';
+import '../../widgets/stat_card.dart';
+import '../../widgets/scholarship_card.dart';
+import '../../widgets/quick_action_card.dart';
+
+class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
+
+  @override
+  State<StudentDashboard> createState() => _StudentDashboardState();
+}
+
+class _StudentDashboardState extends State<StudentDashboard> {
+
+  int selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
 
-      appBar: AppBar(
-        title: const Text("Student Dashboard"),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-      ),
-
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-
-        child: GridView.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: 18,
-          mainAxisSpacing: 18,
-
+      body: SingleChildScrollView(
+        child: Column(
           children: [
 
-            dashboardCard(
-              Icons.school,
-              "Scholarships",
-              Colors.blue,
+          const DashboardHeader(
+          userName: "Vino",
+        ),
+
+        const SizedBox(height: 20),
+
+        const FeatureBanner(),
+
+        const SizedBox(height: 25),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text(
+                    "Trending Scholarships",
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    "See All",
+                    style: TextStyle(
+                      color: Color(0xFF2563EB),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
 
-            dashboardCard(
-              Icons.assignment,
-              "My Applications",
-              Colors.orange,
+            const SizedBox(height: 18),
+
+            SizedBox(
+              height: 260,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                children: [
+                  ScholarshipCard(
+                    title: "Government Scholarship",
+                    amount: "₹25,000",
+                    lastDate: "30 Aug 2026",
+                    icon: Icons.account_balance,
+                    onTap: () {},
+                  ),
+
+                  ScholarshipCard(
+                    title: "Merit Scholarship",
+                    amount: "₹50,000",
+                    lastDate: "15 Sep 2026",
+                    icon: Icons.workspace_premium,
+                    onTap: () {},
+                  ),
+
+                  ScholarshipCard(
+                    title: "Sports Scholarship",
+                    amount: "₹30,000",
+                    lastDate: "05 Oct 2026",
+                    icon: Icons.sports_soccer,
+                    onTap: () {},
+                  ),
+                ],
+              ),
             ),
 
-            dashboardCard(
-              Icons.person,
-              "Profile",
-              Colors.green,
+            const SizedBox(height: 30),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text(
+                    "Quick Actions",
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Icon(
+                    Icons.flash_on,
+                    color: Colors.amber,
+                  ),
+                ],
+              ),
             ),
 
-            dashboardCard(
-              Icons.notifications,
-              "Notifications",
-              Colors.red,
+            const SizedBox(height: 18),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 15,
+                mainAxisSpacing: 15,
+                childAspectRatio: 1.2,
+                children: [
+                  QuickActionCard(
+                    icon: Icons.assignment,
+                    title: "My Applications",
+                    color: Colors.blue,
+                    onTap: () {},
+                  ),
+
+                  QuickActionCard(
+                    icon: Icons.person,
+                    title: "My Profile",
+                    color: Colors.green,
+                    onTap: () {},
+                  ),
+
+                  QuickActionCard(
+                    icon: Icons.favorite,
+                    title: "Saved",
+                    color: Colors.red,
+                    onTap: () {},
+                  ),
+
+                  QuickActionCard(
+                    icon: Icons.support_agent,
+                    title: "Support",
+                    color: Colors.orange,
+                    onTap: () {},
+                  ),
+                ],
+              ),
             ),
 
-            dashboardCard(
-              Icons.logout,
-              "Logout",
-              Colors.purple,
-            ),
+            const SizedBox(height: 30),
+
           ],
         ),
       ),
-    );
-  }
 
-  Widget dashboardCard(
-      IconData icon,
-      String title,
-      Color color,
-      ) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-      ),
-
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-
-        children: [
-
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: color.withOpacity(.1),
-
-            child: Icon(
-              icon,
-              color: color,
-              size: 35,
-            ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: selectedIndex,
+        selectedItemColor: const Color(0xFF2563EB),
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        onTap: (index) {
+          setState(() {
+            selectedIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: "Home",
           ),
-
-          const SizedBox(height: 15),
-
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 17,
-            ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.search),
+            label: "Search",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.assignment),
+            label: "Applications",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: "Profile",
           ),
         ],
       ),
