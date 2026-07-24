@@ -7,6 +7,7 @@ import '../../widgets/custom_textfield.dart';
 import '../../widgets/login_header.dart';
 import '../student/student_dashboard.dart';
 import 'signup_screen.dart';
+import '../sponser/sponser_dashboard.dart';
 
 
 class LoginScreen extends StatefulWidget {
@@ -134,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const StudentDashboard(),
+                              builder: (_) => const SponsorDashboard(),
                             ),
                           );
                         } on FirebaseAuthException catch (e) {
