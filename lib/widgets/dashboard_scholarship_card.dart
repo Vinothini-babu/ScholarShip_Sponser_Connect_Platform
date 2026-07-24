@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 
-class ScholarshipCard extends StatelessWidget {
+class DashboardScholarshipCard extends StatelessWidget {
   final String title;
   final String amount;
-  final String lastDate;
+  final String deadline;
   final IconData icon;
   final VoidCallback onTap;
 
-  const ScholarshipCard({
+  const DashboardScholarshipCard({
     super.key,
     required this.title,
     required this.amount,
-    required this.lastDate,
+    required this.deadline,
     required this.icon,
     required this.onTap,
   });
@@ -19,16 +19,16 @@ class ScholarshipCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 260,
-      margin: const EdgeInsets.only(right: 15),
+      width: 270,
+      margin: const EdgeInsets.only(right: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(.08),
+            color: Colors.black.withOpacity(.06),
             blurRadius: 12,
-            offset: const Offset(0, 5),
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -39,12 +39,12 @@ class ScholarshipCard extends StatelessWidget {
           children: [
 
             CircleAvatar(
-              radius: 28,
+              radius: 26,
               backgroundColor: const Color(0xFFEFF6FF),
               child: Icon(
                 icon,
                 color: const Color(0xFF2563EB),
-                size: 30,
+                size: 28,
               ),
             ),
 
@@ -55,6 +55,7 @@ class ScholarshipCard extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 19,
                 fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
               ),
             ),
 
@@ -64,23 +65,23 @@ class ScholarshipCard extends StatelessWidget {
               amount,
               style: const TextStyle(
                 fontSize: 24,
-                color: Color(0xFF2563EB),
                 fontWeight: FontWeight.bold,
+                color: Color(0xFF2563EB),
               ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
             Row(
               children: [
                 const Icon(
-                  Icons.calendar_today,
+                  Icons.schedule,
                   size: 16,
                   color: Colors.grey,
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  "Last Date: $lastDate",
+                  deadline,
                   style: const TextStyle(
                     color: Colors.grey,
                   ),
@@ -97,13 +98,20 @@ class ScholarshipCard extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2563EB),
                   foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text("View Details"),
+                child: const Text(
+                  "View Details",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
+
           ],
         ),
       ),

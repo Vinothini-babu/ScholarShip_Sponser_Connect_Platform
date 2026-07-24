@@ -60,10 +60,10 @@ class RoleSelectionScreen extends StatelessWidget {
                   const SizedBox(height: 15),
 
                   const Center(
-                    child: AppLogo(size: 200),
+                    child: AppLogo(size: 250),
                   ),
 
-                  const SizedBox(height: 25),
+                  const SizedBox(height:10),
 
                   const Text(
                     "Welcome 👋",

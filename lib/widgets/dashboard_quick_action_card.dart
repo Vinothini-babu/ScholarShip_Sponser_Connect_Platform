@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 
-class QuickActionCard extends StatelessWidget {
+class DashboardQuickActionCard extends StatelessWidget {
   final IconData icon;
   final String title;
-  final VoidCallback onTap;
   final Color color;
+  final VoidCallback onTap;
 
-  const QuickActionCard({
+  const DashboardQuickActionCard({
     super.key,
     required this.icon,
     required this.title,
-    required this.onTap,
     required this.color,
+    required this.onTap,
   });
 
   @override
@@ -20,14 +20,13 @@ class QuickActionCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(.06),
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 12,
               offset: const Offset(0, 5),
             ),
           ],
@@ -35,25 +34,25 @@ class QuickActionCard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-
             CircleAvatar(
-              radius: 28,
-              backgroundColor: color.withOpacity(.15),
+              radius: 26,
+              backgroundColor: color.withOpacity(0.15),
               child: Icon(
                 icon,
                 color: color,
-                size: 30,
+                size: 28,
               ),
             ),
 
-            const SizedBox(height: 15),
+            const SizedBox(height: 14),
 
             Text(
               title,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontWeight: FontWeight.w600,
                 fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1E293B),
               ),
             ),
           ],

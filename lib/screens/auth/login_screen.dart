@@ -208,7 +208,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const Center(
                       child: Text(
-                        "Made with ❤️ by PKR Students",
+                        "Made with ❤️ by PKR Student",
                         style: TextStyle(
                           color: Colors.grey,
                           fontSize: 13,
