@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../widgets/dashboard_header.dart';
 import '../../widgets/dashboard_stat_card.dart';
 import '../../widgets/dashboard_banner.dart';
+import '../../widgets/dashboard_scholarship_card.dart';
+import '../../widgets/dashboard_quick_action_card.dart';
 
 class StudentDashboard extends StatelessWidget {
   const StudentDashboard({super.key});
@@ -20,6 +22,10 @@ class StudentDashboard extends StatelessWidget {
 
             const SizedBox(height: 20),
 
+            const DashboardBanner(),
+
+            const SizedBox(height: 25),
+
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: GridView.count(
@@ -28,7 +34,7 @@ class StudentDashboard extends StatelessWidget {
                 crossAxisCount: 2,
                 crossAxisSpacing: 15,
                 mainAxisSpacing: 15,
-                childAspectRatio: 1.2,
+                childAspectRatio: 1.05,
                 children: const [
                   DashboardStatCard(
                     icon: Icons.school,
@@ -58,11 +64,72 @@ class StudentDashboard extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 25),
-
-            const DashboardBanner(),
+            const SizedBox(height: 18),
 
             const SizedBox(height: 30),
+
+
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text(
+                    "Trending Scholarships",
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    "See All",
+                    style: TextStyle(
+                      color: Color(0xFF2563EB),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+
+
+            SizedBox(
+              height: 270,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                children: [
+                  DashboardScholarshipCard(
+                    title: "Government Scholarship",
+                    amount: "₹25,000",
+                    deadline: "30 Aug 2026",
+                    icon: Icons.account_balance,
+                    onTap: () {},
+                  ),
+
+                  DashboardScholarshipCard(
+                    title: "Merit Scholarship",
+                    amount: "₹50,000",
+                    deadline: "15 Sep 2026",
+                    icon: Icons.workspace_premium,
+                    onTap: () {},
+                  ),
+
+                  DashboardScholarshipCard(
+                    title: "Sports Scholarship",
+                    amount: "₹30,000",
+                    deadline: "05 Oct 2026",
+                    icon: Icons.sports_soccer,
+                    onTap: () {},
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
 
           ],
         ),
