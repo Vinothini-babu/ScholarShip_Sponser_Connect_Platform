@@ -1,61 +1,58 @@
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_text_styles.dart';
+
 class ApplicationScreen extends StatelessWidget {
   const ApplicationScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
         centerTitle: true,
-        title: const Text(
+        title: Text(
           "My Applications",
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
+          style: AppTextStyles.title.copyWith(fontSize: 18, color: AppColors.textPrimary),
         ),
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
-
       body: ListView(
         padding: const EdgeInsets.all(20),
-        children: const [
-
+        children: [
           ApplicationCard(
             title: "Government Scholarship",
             amount: "₹25,000",
             status: "Under Review",
-            color: Colors.orange,
+            color: AppColors.warning,
           ),
 
-          SizedBox(height: 18),
+          const SizedBox(height: 16),
 
           ApplicationCard(
             title: "Merit Scholarship",
             amount: "₹50,000",
             status: "Approved",
-            color: Colors.green,
+            color: AppColors.success,
           ),
 
-          SizedBox(height: 18),
+          const SizedBox(height: 16),
 
           ApplicationCard(
             title: "Sports Scholarship",
             amount: "₹30,000",
             status: "Rejected",
-            color: Colors.red,
+            color: AppColors.error,
           ),
-
         ],
       ),
     );
   }
 }
+
 class ApplicationCard extends StatelessWidget {
   final String title;
   final String amount;
@@ -70,108 +67,120 @@ class ApplicationCard extends StatelessWidget {
     required this.color,
   });
 
+  IconData get _statusIcon {
+    switch (status) {
+      case "Approved":
+        return Icons.check_circle_rounded;
+      case "Rejected":
+        return Icons.cancel_rounded;
+      default:
+        return Icons.hourglass_top_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-
-            Row(
-              children: [
-
-                const CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Color(0xFFEFF6FF),
-                  child: Icon(
-                    Icons.school,
-                    color: Color(0xFF2563EB),
-                  ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-
-                const SizedBox(width: 15),
-
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-
-              ],
-            ),
-
-            const SizedBox(height: 15),
-
-            Text(
-              "Scholarship Amount : $amount",
-              style: const TextStyle(
-                fontSize: 16,
+                child: Icon(Icons.school_rounded, color: AppColors.primary, size: 24),
               ),
-            ),
-
-            const SizedBox(height: 15),
-
-            Row(
-              children: [
-
-                const Text(
-                  "Status : ",
-                  style: TextStyle(
+              const SizedBox(width: 15),
+              Expanded(
+                child: Text(
+                  title,
+                  style: AppTextStyles.subtitle.copyWith(
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
                 ),
-
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.bold,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(_statusIcon, size: 13, color: color),
+                    const SizedBox(width: 5),
+                    Text(
+                      status,
+                      style: AppTextStyles.subtitle.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
+              ),
+            ],
+          ),
 
-              ],
-            ),
+          const SizedBox(height: 16),
 
-            const SizedBox(height: 18),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+          Row(
+            children: [
+              Icon(Icons.currency_rupee_rounded, size: 15, color: AppColors.textSecondary),
+              const SizedBox(width: 4),
+              Text(
+                "Scholarship Amount: $amount",
+                style: AppTextStyles.subtitle.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
                 ),
-                child: const Text("View Details"),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 18),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () {},
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: BorderSide(color: AppColors.primary, width: 1.4),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text(
+                "View Details",
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
-
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -1,73 +1,69 @@
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_text_styles.dart';
+
 class ManageScholarshipsScreen extends StatelessWidget {
   const ManageScholarshipsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2563EB),
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.background,
+        elevation: 0,
         centerTitle: true,
-        title: const Text(
+        title: Text(
           "Manage Scholarships",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+          style: AppTextStyles.title.copyWith(fontSize: 18, color: AppColors.textPrimary),
         ),
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
-
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-
-          const Text(
+          Text(
             "Available Scholarships",
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+            style: AppTextStyles.title.copyWith(fontSize: 22, color: AppColors.textPrimary),
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
-          const Text(
+          Text(
             "View and manage all scholarships.",
-            style: TextStyle(
-              color: Colors.grey,
-            ),
+            style: AppTextStyles.subtitle,
           ),
 
-          const SizedBox(height: 25),
+          const SizedBox(height: 22),
 
           _buildScholarshipCard(
             context,
             title: "Government Scholarship",
             sponsor: "ABC Foundation",
             amount: "₹25,000",
+            accent: AppColors.primary,
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
           _buildScholarshipCard(
             context,
             title: "Merit Scholarship",
             sponsor: "Bright Future Trust",
             amount: "₹50,000",
+            accent: AppColors.secondary,
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
           _buildScholarshipCard(
             context,
             title: "Sports Scholarship",
             sponsor: "Helping Hands",
             amount: "₹30,000",
+            accent: AppColors.success,
           ),
-
         ],
       ),
     );
@@ -78,16 +74,16 @@ class ManageScholarshipsScreen extends StatelessWidget {
         required String title,
         required String sponsor,
         required String amount,
+        required Color accent,
       }) {
     return Container(
-      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
             offset: const Offset(0, 5),
           ),
         ],
@@ -95,76 +91,111 @@ class ManageScholarshipsScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
+          Container(
+            height: 5,
+            decoration: BoxDecoration(
+              color: accent,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
             ),
           ),
-
-          const SizedBox(height: 10),
-
-          Text("🏢 Sponsor : $sponsor"),
-
-          const SizedBox(height: 6),
-
-          Text("💰 Amount : $amount"),
-
-          const SizedBox(height: 20),
-          Row(
-            children: [
-
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text("Editing $title ✏️"),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.edit),
-                  label: const Text("Edit"),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2563EB),
-                    side: const BorderSide(
-                      color: Color(0xFF2563EB),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.subtitle.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
                   ),
                 ),
-              ),
 
-              const SizedBox(width: 15),
+                const SizedBox(height: 12),
 
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text("$title Deleted Successfully 🗑️"),
+                Row(
+                  children: [
+                    Icon(Icons.business_rounded, size: 15, color: AppColors.textSecondary),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        sponsor,
+                        style: AppTextStyles.subtitle.copyWith(fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.delete),
-                  label: const Text("Delete"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ),
+                  ],
                 ),
-              ),
 
-            ],
+                const SizedBox(height: 6),
+
+                Row(
+                  children: [
+                    Icon(Icons.currency_rupee_rounded, size: 15, color: AppColors.textSecondary),
+                    const SizedBox(width: 5),
+                    Text(
+                      amount,
+                      style: AppTextStyles.subtitle.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 18),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Editing $title ✏️")),
+                          );
+                        },
+                        icon: Icon(Icons.edit_rounded, size: 17, color: AppColors.primary),
+                        label: Text("Edit", style: TextStyle(color: AppColors.primary)),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: AppColors.primary, width: 1.4),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("$title Deleted Successfully 🗑️")),
+                          );
+                        },
+                        icon: const Icon(Icons.delete_rounded, size: 17),
+                        label: const Text("Delete"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.error,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-
         ],
       ),
     );

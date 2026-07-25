@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_text_styles.dart';
 import 'add_scholarship_screen.dart';
 import 'manage_scholarship_screen.dart';
 import 'applications_screen.dart';
@@ -11,254 +13,297 @@ class SponsorDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF2563EB),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: const Text("Sponsor Dashboard"),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.notifications),
-          ),
-        ],
-      ),
-
+      backgroundColor: AppColors.background,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
+            // Header — replaces the old AppBar + separate gradient card
+            // with one combined gradient zone (less visual repetition)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 56, 20, 18),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF2563EB),
-                    Color(0xFF3B82F6),
-                  ],
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.primary, AppColors.primary.withOpacity(0.85)],
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(32),
+                  bottomRight: Radius.circular(32),
+                ),
               ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    "Welcome Back 👋",
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 16,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Welcome Back 👋",
+                        style: AppTextStyles.subtitle.copyWith(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        "ABC Foundation",
+                        style: AppTextStyles.title.copyWith(
+                          color: Colors.white,
+                          fontSize: 30,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 8),
-                  Text(
-                    "ABC Foundation",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      onPressed: () {},
+                      icon: const Icon(Icons.notifications_rounded, color: Colors.white),
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 25),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Quick Actions", style: AppTextStyles.title.copyWith(fontSize: 18)),
 
-            const Text(
-              "Quick Actions",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+                  const SizedBox(height: 16),
 
-            const SizedBox(height: 18),
-
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              crossAxisSpacing: 15,
-              mainAxisSpacing: 15,
-              childAspectRatio: 1.1,
-              children: [
-
-                _buildCard(
-                  context,
-                  Icons.add_circle,
-                  "Add Scholarship",
-                  Colors.blue,
-                  const AddScholarshipScreen(),
-                ),
-
-                _buildCard(
-                  context,
-                  Icons.list_alt,
-                  "Manage",
-                  Colors.orange,
-                  const ManageScholarshipScreen(),
-                ),
-
-                _buildCard(
-                  context,
-                  Icons.assignment,
-                  "Applications",
-                  Colors.green,
-                  const ApplicationsScreen(),
-                ),
-
-                _buildCard(
-                  context,
-                  Icons.person,
-                  "Profile",
-                  Colors.purple,
-                  const SponsorProfileScreen(),
-                ),
-
-              ],
-            ),
-
-            const SizedBox(height: 30),
-
-            const Text(
-              "Overview",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const ListTile(
-                leading: Icon(
-                  Icons.school,
-                  color: Color(0xFF2563EB),
-                ),
-                title: Text("Total Scholarships"),
-                trailing: Text(
-                  "12",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ActionCard(
+                          icon: Icons.add_circle_rounded,
+                          title: "Add Scholarship",
+                          accent: AppColors.primary,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AddScholarshipScreen()),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: _ActionCard(
+                          icon: Icons.list_alt_rounded,
+                          title: "Manage",
+                          accent: AppColors.secondary,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ManageScholarshipScreen()),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-            ),
 
-            const SizedBox(height: 10),
+                  const SizedBox(height: 14),
 
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const ListTile(
-                leading: Icon(
-                  Icons.people,
-                  color: Colors.green,
-                ),
-                title: Text("Applications Received"),
-                trailing: Text(
-                  "156",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ActionCard(
+                          icon: Icons.assignment_rounded,
+                          title: "Applications",
+                          accent: AppColors.success,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ApplicationsScreen()),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: _ActionCard(
+                          icon: Icons.person_rounded,
+                          title: "Profile",
+                          accent: AppColors.error,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const SponsorProfileScreen()),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-            ),
 
-            const SizedBox(height: 10),
+                  const SizedBox(height: 24),
 
-            Card(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const ListTile(
-                leading: Icon(
-                  Icons.check_circle,
-                  color: Colors.orange,
-                ),
-                title: Text("Approved Students"),
-                trailing: Text(
-                  "48",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+                  Text("Overview", style: AppTextStyles.title.copyWith(fontSize: 18)),
+
+                  const SizedBox(height: 16),
+
+                  _OverviewTile(
+                    icon: Icons.school_rounded,
+                    label: "Total Scholarships",
+                    value: "12",
+                    accent: AppColors.primary,
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  _OverviewTile(
+                    icon: Icons.people_rounded,
+                    label: "Applications Received",
+                    value: "156",
+                    accent: AppColors.success,
+                  ),
+                  const SizedBox(height: 12),
+                  _OverviewTile(
+                    icon: Icons.check_circle_rounded,
+                    label: "Approved Students",
+                    value: "48",
+                    accent: AppColors.secondary,
+                  ),
+                ],
               ),
             ),
-
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildCard(
-      BuildContext context,
-      IconData icon,
-      String title,
-      Color color,
-      Widget page,
-      ) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => page,
+class _ActionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _ActionCard({
+    required this.icon,
+    required this.title,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(18);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: radius,
+      child: InkWell(
+        borderRadius: radius,
+        onTap: onTap,
+        splashColor: accent.withOpacity(0.12),
+        highlightColor: accent.withOpacity(0.06),
+        child: Container(
+          height: 108,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: radius,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 10,
-            ),
-          ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.13),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: accent, size: 22),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.subtitle.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+      ),
+    );
+  }
+}
 
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: color.withOpacity(0.15),
-              child: Icon(
-                icon,
-                color: color,
-                size: 30,
+class _OverviewTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color accent;
+
+  const _OverviewTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: accent.withOpacity(0.13),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: accent, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              label,
+              style: AppTextStyles.subtitle.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
               ),
             ),
-
-            const SizedBox(height: 12),
-
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
+          ),
+          Text(
+            value,
+            style: AppTextStyles.title.copyWith(
+              fontSize: 19,
+              color: AppColors.textPrimary,
             ),
-
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

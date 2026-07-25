@@ -1,161 +1,186 @@
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_text_styles.dart';
+
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          "My Profile",
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        iconTheme: const IconThemeData(color: Colors.black),
-      ),
-
+      backgroundColor: AppColors.background,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-
-            const CircleAvatar(
-              radius: 55,
-              backgroundColor: Color(0xFFE3F2FD),
-              child: Icon(
-                Icons.person,
-                size: 60,
-                color: Color(0xFF2563EB),
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            const Text(
-              "Vinothini B",
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 5),
-
-            const Text(
-              "Student",
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 16,
-              ),
-            ),
-
-            const SizedBox(height: 30),
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const ListTile(
-                leading: Icon(Icons.email, color: Color(0xFF2563EB)),
-                title: Text("Email"),
-                subtitle: Text("vinothini@gmail.com"),
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const ListTile(
-                leading: Icon(Icons.school, color: Color(0xFF2563EB)),
-                title: Text("College"),
-                subtitle: Text("P.K.R Arts College for Women"),
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const ListTile(
-                leading: Icon(Icons.menu_book, color: Color(0xFF2563EB)),
-                title: Text("Course"),
-                subtitle: Text("B.Sc Computer Science"),
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: const ListTile(
-                leading: Icon(Icons.phone, color: Color(0xFF2563EB)),
-                title: Text("Phone"),
-                subtitle: Text("+91 9876543210"),
-              ),
-            ),
-
-            const SizedBox(height: 30),
-
-            SizedBox(
+            // Header zone — matches the dashboard's gradient header
+            Container(
               width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.edit),
-                label: const Text("Edit Profile"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+              padding: const EdgeInsets.fromLTRB(20, 60, 20, 36),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.primary, AppColors.primary.withOpacity(0.85)],
+                ),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(32),
+                  bottomRight: Radius.circular(32),
                 ),
               ),
-            ),
-
-            const SizedBox(height: 15),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                icon: const Icon(Icons.logout),
-                label: const Text("Logout"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.secondary, width: 2.5),
+                    ),
+                    child: CircleAvatar(
+                      radius: 48,
+                      backgroundColor: AppColors.secondary.withOpacity(0.2),
+                      child: Icon(Icons.person_rounded, size: 52, color: AppColors.secondary),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Vinothini B",
+                    style: AppTextStyles.title.copyWith(color: Colors.white, fontSize: 22),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      "Student",
+                      style: AppTextStyles.subtitle.copyWith(color: Colors.white, fontSize: 13),
+                    ),
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 30),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  _InfoTile(icon: Icons.email_rounded, label: "Email", value: "vinothini@gmail.com"),
+                  const SizedBox(height: 14),
+                  _InfoTile(icon: Icons.school_rounded, label: "College", value: "P.K.R Arts College for Women"),
+                  const SizedBox(height: 14),
+                  _InfoTile(icon: Icons.menu_book_rounded, label: "Course", value: "B.Sc Computer Science"),
+                  const SizedBox(height: 14),
+                  _InfoTile(icon: Icons.phone_rounded, label: "Phone", value: "+91 9876543210"),
 
+                  const SizedBox(height: 30),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.edit_rounded, size: 19),
+                      label: const Text("Edit Profile"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      icon: Icon(Icons.logout_rounded, size: 19, color: AppColors.error),
+                      label: Text(
+                        "Logout",
+                        style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w600),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: AppColors.error, width: 1.4),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _InfoTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoTile({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.secondary.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppTextStyles.subtitle.copyWith(fontSize: 12)),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: AppTextStyles.subtitle.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
