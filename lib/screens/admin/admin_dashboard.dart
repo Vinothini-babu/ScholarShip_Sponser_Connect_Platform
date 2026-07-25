@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'manage_scholarships_screen.dart';
+import 'manage_sponsors_screen.dart';
+import 'manage_students_screen.dart';
+import 'view_applications_screen.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -84,31 +88,35 @@ class AdminDashboard extends StatelessWidget {
               children: [
 
                 _buildCard(
+                  context,
                   Icons.people,
                   "Students",
-                  "250",
                   Colors.blue,
+                  const ManageStudentsScreen(),
                 ),
 
                 _buildCard(
+                  context,
                   Icons.business,
                   "Sponsors",
-                  "35",
                   Colors.green,
+                  const ManageSponsorsScreen(),
                 ),
 
                 _buildCard(
+                  context,
                   Icons.school,
                   "Scholarships",
-                  "120",
                   Colors.orange,
+                  const ManageScholarshipsScreen(),
                 ),
 
                 _buildCard(
+                  context,
                   Icons.assignment,
                   "Applications",
-                  "540",
                   Colors.purple,
+                  const ViewApplicationsScreen(),
                 ),
 
               ],
@@ -148,13 +156,13 @@ class AdminDashboard extends StatelessWidget {
                   Colors.green,
                 ),
 
-                _buildActionCard(
+                _buildCard(
                   context,
                   Icons.school,
-                  "Manage Scholarships",
-                  Colors.orange,
+                  "Manage Scholarship",
+                  Colors.blue,
+                  const ManageScholarshipsScreen(),
                 ),
-
                 _buildActionCard(
                   context,
                   Icons.analytics,
@@ -174,61 +182,58 @@ class AdminDashboard extends StatelessWidget {
   }
 
   Widget _buildCard(
+      BuildContext context,
       IconData icon,
       String title,
-      String value,
       Color color,
+      Widget page,
       ) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => page,
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: color.withOpacity(0.15),
-            child: Icon(
-              icon,
-              color: color,
-              size: 28,
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
             ),
-          ),
-
-          const SizedBox(height: 12),
-
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: color.withOpacity(0.15),
+              child: Icon(
+                icon,
+                color: color,
+                size: 30,
+              ),
             ),
-          ),
-
-          const SizedBox(height: 5),
-
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.grey,
+            const SizedBox(height: 12),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-
-        ],
+          ],
+        ),
       ),
     );
   }
-
   Widget _buildActionCard(
       BuildContext context,
       IconData icon,

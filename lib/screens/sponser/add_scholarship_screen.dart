@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/scholarship_service.dart';
 
 class AddScholarshipScreen extends StatefulWidget {
   const AddScholarshipScreen({super.key});
@@ -9,6 +10,8 @@ class AddScholarshipScreen extends StatefulWidget {
 }
 
 class _AddScholarshipScreenState extends State<AddScholarshipScreen> {
+
+  final ScholarshipService _scholarshipService = ScholarshipService();
 
   final TextEditingController titleController = TextEditingController();
   final TextEditingController amountController = TextEditingController();
@@ -139,14 +142,52 @@ class _AddScholarshipScreenState extends State<AddScholarshipScreen> {
                 ),
               ),
               child: ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        "Scholarship Published Successfully 🎉",
+                onPressed: () async {
+
+                  if (titleController.text.isEmpty ||
+                      amountController.text.isEmpty ||
+                      descriptionController.text.isEmpty ||
+                      deadlineController.text.isEmpty) {
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Please fill all required fields"),
                       ),
-                    ),
-                  );
+                    );
+                    return;
+                  }
+
+                  try {
+
+                    await _scholarshipService.addScholarship(
+                      title: titleController.text.trim(),
+                      amount: amountController.text.trim(),
+                      description: descriptionController.text.trim(),
+                      deadline: deadlineController.text.trim(),
+                    );
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Scholarship Published Successfully 🎉"),
+                      ),
+                    );
+
+                    titleController.clear();
+                    amountController.clear();
+                    eligibilityController.clear();
+                    deadlineController.clear();
+                    descriptionController.clear();
+
+                  } catch (e) {
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(e.toString()),
+                      ),
+                    );
+
+                  }
+
                 },
                 icon: const Icon(Icons.publish),
                 label: const Text(

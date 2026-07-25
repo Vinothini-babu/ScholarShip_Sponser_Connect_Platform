@@ -8,6 +8,7 @@ import '../../widgets/login_header.dart';
 import '../student/student_dashboard.dart';
 import 'signup_screen.dart';
 import '../sponser/sponser_dashboard.dart';
+import '../admin/admin_dashboard.dart';
 
 
 class LoginScreen extends StatefulWidget {
@@ -132,12 +133,36 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           );
 
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const SponsorDashboard(),
-                            ),
-                          );
+                          String role = await _authService.getUserRole();
+
+                          if (role == "student") {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const StudentDashboard(),
+                              ),
+                            );
+                          } else if (role == "sponsor") {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SponsorDashboard(),
+                              ),
+                            );
+                          } else if (role == "admin") {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const AdminDashboard(),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Invalid user role"),
+                              ),
+                            );
+                          }
                         } on FirebaseAuthException catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(

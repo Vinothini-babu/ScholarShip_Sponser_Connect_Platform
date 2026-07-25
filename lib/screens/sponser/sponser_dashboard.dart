@@ -218,7 +218,7 @@ class SponsorDashboard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => const SponsorDashboard(),
+            builder: (_) => page,
           ),
         );
       },

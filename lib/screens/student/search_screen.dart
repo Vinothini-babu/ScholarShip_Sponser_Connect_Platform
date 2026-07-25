@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../services/scholarship_service.dart';
+import '../../models/scholarship_model.dart';
+import '../../services/application_service.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -9,6 +12,8 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController searchController = TextEditingController();
+  final ScholarshipService _service = ScholarshipService();
+  final ApplicationService _applicationService = ApplicationService();
 
   @override
   Widget build(BuildContext context) {
@@ -51,40 +56,51 @@ class _SearchScreenState extends State<SearchScreen> {
             const SizedBox(height: 20),
 
             Expanded(
-              child: ListView(
-                children: [
+              child: StreamBuilder<List<ScholarshipModel>>(
+                stream: _service.getScholarships(),
+                builder: (context, snapshot) {
 
-                  scholarshipCard(
-                    title: "Government Scholarship",
-                    amount: "₹25,000",
-                    deadline: "30 Aug 2026",
-                    icon: Icons.account_balance,
-                  ),
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
 
-                  scholarshipCard(
-                    title: "Merit Scholarship",
-                    amount: "₹50,000",
-                    deadline: "15 Sep 2026",
-                    icon: Icons.workspace_premium,
-                  ),
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(
+                      child: Text("No Scholarships Available"),
+                    );
+                  }
 
-                  scholarshipCard(
-                    title: "Sports Scholarship",
-                    amount: "₹30,000",
-                    deadline: "05 Oct 2026",
-                    icon: Icons.sports_soccer,
-                  ),
+                  final scholarships = snapshot.data!;
 
-                ],
+                  return ListView.builder(
+                    itemCount: scholarships.length,
+                    itemBuilder: (context, index) {
+
+                      final scholarship = scholarships[index];
+
+                      return scholarshipCard(
+                        id: scholarship.id,
+                        title: scholarship.title,
+                        amount: scholarship.amount,
+                        deadline: scholarship.deadline,
+                        icon: Icons.school,
+                      );
+
+                    },
+                  );
+
+                },
               ),
             ),
-
           ],
         ),
       ),
     );
   }
   Widget scholarshipCard({
+    required String id,
     required String title,
     required String amount,
     required String deadline,
@@ -150,8 +166,30 @@ class _SearchScreenState extends State<SearchScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
+                onPressed: () async {
+                  try {
+
+                    await _applicationService.applyScholarship(
+                      scholarshipId: id,
+                      scholarshipTitle: title,
+                    );
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Application Submitted Successfully 🎉"),
+                      ),
+                    );
+
+                  } catch (e) {
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(e.toString()),
+                      ),
+                    );
+
+                  }
+                },                style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2563EB),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),

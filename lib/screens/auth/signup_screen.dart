@@ -176,8 +176,12 @@ class _SignupScreenState extends State<SignupScreen> {
 
                   try {
                     await _authService.signUp(
+                      name: nameController.text.trim(),
                       email: emailController.text.trim(),
+                      mobile: mobileController.text.trim(),
+                      college: collegeController.text.trim(),
                       password: passwordController.text.trim(),
+                      role: "student",
                     );
 
                     ScaffoldMessenger.of(context).showSnackBar(
