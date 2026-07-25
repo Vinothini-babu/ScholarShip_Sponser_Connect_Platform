@@ -3,164 +3,208 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../widgets/app_logo.dart';
-import '../../widgets/premium_role_card.dart';
-import 'login_screen.dart';
+import '../auth/login_screen.dart';
 
-class RoleSelectionScreen extends StatelessWidget {
+enum UserRole { student, sponsor, admin }
+
+class _RoleOption {
+  final UserRole role;
+  final IconData icon;
+  final String label;
+  final String description;
+
+  const _RoleOption({
+    required this.role,
+    required this.icon,
+    required this.label,
+    required this.description,
+  });
+}
+
+class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
+
+  @override
+  State<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
+}
+
+class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
+  UserRole? _selectedRole;
+
+  final List<_RoleOption> _options = const [
+    _RoleOption(
+      role: UserRole.student,
+      icon: Icons.school_rounded,
+      label: 'Student',
+      description: 'Find and apply for scholarships',
+    ),
+    _RoleOption(
+      role: UserRole.sponsor,
+      icon: Icons.volunteer_activism_rounded,
+      label: 'Sponsor',
+      description: 'Fund students and track impact',
+    ),
+    _RoleOption(
+      role: UserRole.admin,
+      icon: Icons.admin_panel_settings_rounded,
+      label: 'Admin',
+      description: 'Manage users and verify applications',
+    ),
+  ];
+
+  void _continue() {
+    if (_selectedRole == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            children: [
+              const SizedBox(height: 28),
 
-      body: Stack(
-        children: [
+              const AppLogo(size: 300),
 
-          // Background Circle
-          Positioned(
-            top: -120,
-            right: -80,
-            child: Container(
-              height: 250,
-              width: 250,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(.08),
-                shape: BoxShape.circle,
+              const SizedBox(height: 2),
+
+              Text(
+                'Who are you?',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.heading.copyWith(
+                  fontSize: 26,
+                  color: AppColors.textPrimary,
+                ),
               ),
-            ),
-          ),
-
-          Positioned(
-            bottom: -120,
-            left: -80,
-            child: Container(
-              height: 250,
-              width: 250,
-              decoration: BoxDecoration(
-                color: AppColors.secondary.withOpacity(.08),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 20,
+              const SizedBox(height: 8),
+              Text(
+                'Select your role to continue',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.subtitle,
               ),
 
-              child: Column(
+              const SizedBox(height: 32),
 
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Expanded(
+                child: ListView.separated(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _options.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final option = _options[index];
+                    final isSelected = option.role == _selectedRole;
 
-                children: [
-
-                  const SizedBox(height: 15),
-
-                  const Center(
-                    child: AppLogo(size: 250),
-                  ),
-
-                  const SizedBox(height:10),
-
-                  const Text(
-                    "Welcome 👋",
-                    style: TextStyle(
-                      fontSize: 34,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  const Text(
-                    "Choose your role to continue",
-                    style: AppTextStyles.subtitle,
-                  ),
-
-                  const SizedBox(height: 35),
-
-                  PremiumRoleCard(
-                    icon: Icons.school_rounded,
-                    iconColor: Colors.blue,
-                    title: "Student",
-                    subtitle: "Find & Apply Scholarships",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const LoginScreen(),
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedRole = option.role),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOut,
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.secondary
+                                : AppColors.textSecondary.withOpacity(0.15),
+                            width: isSelected ? 2 : 1,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                            BoxShadow(
+                              color: AppColors.secondary.withOpacity(0.18),
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
+                            ),
+                          ]
+                              : [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  PremiumRoleCard(
-                    icon: Icons.favorite,
-                    iconColor: Colors.green,
-                    title: "Sponsor",
-                    subtitle: "Support Students",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const LoginScreen(),
+                        child: Row(
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              width: 54,
+                              height: 54,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppColors.secondary
+                                    : AppColors.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                option.icon,
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : AppColors.secondary,
+                                size: 26,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    option.label,
+                                    style: AppTextStyles.subtitle.copyWith(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 17,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    option.description,
+                                    style: AppTextStyles.subtitle.copyWith(
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              isSelected
+                                  ? Icons.check_circle_rounded
+                                  : Icons.circle_outlined,
+                              color: isSelected
+                                  ? AppColors.secondary
+                                  : AppColors.textSecondary.withOpacity(0.3),
+                              size: 24,
+                            ),
+                          ],
                         ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  PremiumRoleCard(
-                    icon: Icons.admin_panel_settings,
-                    iconColor: Colors.orange,
-                    title: "Admin",
-                    subtitle: "Manage Platform",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const LoginScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  const Spacer(),
-
-                  const Center(
-                    child: Text(
-                      "Scholarship Sponsor Connect",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
                       ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  const Center(
-                    child: Text(
-                      "Version 2.0",
-                      style: TextStyle(
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                ],
+                    );
+                  },
+                ),
               ),
-            ),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _selectedRole == null ? null : _continue,
+                    child: const Text('Continue'),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
