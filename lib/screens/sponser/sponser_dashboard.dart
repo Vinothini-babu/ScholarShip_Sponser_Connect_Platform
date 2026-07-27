@@ -22,7 +22,7 @@ class SponsorDashboard extends StatelessWidget {
             // with one combined gradient zone (less visual repetition)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 56, 20, 18),
+              padding: const EdgeInsets.fromLTRB(20, 135, 20, 18),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
