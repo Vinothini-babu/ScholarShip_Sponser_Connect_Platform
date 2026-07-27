@@ -5,6 +5,7 @@ import '../../core/constants/app_text_styles.dart';
 import 'search_screen.dart';
 import 'application_screen.dart';
 import 'profile_screen.dart';
+import 'my_applications_screen.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});

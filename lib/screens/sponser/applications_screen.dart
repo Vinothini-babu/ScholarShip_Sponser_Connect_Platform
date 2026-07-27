@@ -58,33 +58,25 @@ class ApplicationsScreen extends StatelessWidget {
 
               const SizedBox(height: 22),
 
-              _buildApplicationCard(
-                context,
-                studentName: "Vinothini",
-                college: "P.K.R Arts College",
-                course: "B.Sc Computer Science",
-                scholarship: "Government Scholarship",
-              ),
+              ...docs.map((doc) {
 
-              const SizedBox(height: 16),
+                final data = doc.data() as Map<String, dynamic>;
 
-              _buildApplicationCard(
-                context,
-                studentName: "Rahul",
-                college: "ABC Engineering College",
-                course: "B.E Computer Science",
-                scholarship: "Merit Scholarship",
-              ),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
 
-              const SizedBox(height: 16),
+                  child: _buildApplicationCard(
+                    context,
+                    documentId: doc.id,
+                    studentName: data["studentName"] ?? "",
+                    college: data["studentCollege"] ?? "",
+                    course: data["studentEmail"] ?? "",
+                    scholarship: data["scholarshipTitle"] ?? "",
+                    status: data["status"] ?? "Pending",
+                  ),
+                );
 
-              _buildApplicationCard(
-                context,
-                studentName: "Priya",
-                college: "XYZ College",
-                course: "BCA",
-                scholarship: "Sports Scholarship",
-              ),
+              }).toList(),
             ],
           );
         },
@@ -92,12 +84,25 @@ class ApplicationsScreen extends StatelessWidget {
     );
   }
 
+  Future<void> updateStatus(
+      String documentId,
+      String status,
+      ) async {
+    await FirebaseFirestore.instance
+        .collection("applications")
+        .doc(documentId)
+        .update({
+      "status": status,
+    });
+  }
   Widget _buildApplicationCard(
       BuildContext context, {
         required String studentName,
         required String college,
         required String course,
         required String scholarship,
+        required String documentId,
+        required String status,
       }) {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -153,16 +158,51 @@ class ApplicationsScreen extends StatelessWidget {
           const SizedBox(height: 6),
           _detailRow(Icons.workspace_premium_rounded, "Scholarship", scholarship),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 15),
+
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 6,
+            ),
+            decoration: BoxDecoration(
+              color: status == "Approved"
+                  ? Colors.green.shade100
+                  : status == "Rejected"
+                  ? Colors.red.shade100
+                  : Colors.orange.shade100,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              status,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: status == "Approved"
+                    ? Colors.green
+                    : status == "Rejected"
+                    ? Colors.red
+                    : Colors.orange,
+              ),
+            ),
+          ),
 
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("$studentName Approved Successfully ✅")),
+                  onPressed: () async {
+
+                    await updateStatus(
+                      documentId,
+                      "Approved",
                     );
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("$studentName Approved Successfully ✅"),
+                      ),
+                    );
+
                   },
                   icon: const Icon(Icons.check_rounded, size: 18),
                   label: const Text("Approve"),
@@ -180,10 +220,19 @@ class ApplicationsScreen extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("$studentName Rejected ❌")),
+                  onPressed: () async {
+
+                    await updateStatus(
+                      documentId,
+                      "Rejected",
                     );
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("$studentName Rejected ❌"),
+                      ),
+                    );
+
                   },
                   icon: Icon(Icons.close_rounded, size: 18, color: AppColors.error),
                   label: Text("Reject", style: TextStyle(color: AppColors.error)),
