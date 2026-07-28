@@ -34,7 +34,6 @@ class AdminDashboard extends StatelessWidget {
           .collection(collection)
           .snapshots(),
       builder: (context, snapshot) {
-
         int count = 0;
 
         if (snapshot.hasData) {
@@ -44,44 +43,54 @@ class AdminDashboard extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(18),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: color.withOpacity(.15),
+              width: 1.4,
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: color.withOpacity(.12),
+                blurRadius: 18,
+                spreadRadius: 2,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-
               CircleAvatar(
-                radius: 24,
-                backgroundColor: color.withOpacity(.15),
+                radius: 28,
+                backgroundColor: color.withOpacity(.12),
                 child: Icon(
                   icon,
                   color: color,
+                  size: 30,
                 ),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 15),
 
               Text(
                 count.toString(),
                 style: AppTextStyles.title.copyWith(
-                  fontSize: 22,
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
                 ),
               ),
 
-              const SizedBox(height: 5),
+              const SizedBox(height: 6),
 
               Text(
                 title,
-                style: AppTextStyles.subtitle,
+                style: AppTextStyles.subtitle.copyWith(
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-
             ],
           ),
         );
@@ -91,15 +100,12 @@ class AdminDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       backgroundColor: AppColors.background,
-
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(
@@ -120,11 +126,9 @@ class AdminDashboard extends StatelessWidget {
                   bottomRight: Radius.circular(30),
                 ),
               ),
-
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
                   Text(
                     "Welcome Admin 👋",
                     style: AppTextStyles.subtitle.copyWith(
@@ -141,18 +145,15 @@ class AdminDashboard extends StatelessWidget {
                       fontSize: 25,
                     ),
                   ),
-
                 ],
               ),
             ),
 
             Padding(
               padding: const EdgeInsets.all(20),
-
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
                   Text(
                     "Dashboard Overview",
                     style: AppTextStyles.title,
@@ -162,7 +163,6 @@ class AdminDashboard extends StatelessWidget {
 
                   Row(
                     children: [
-
                       Expanded(
                         child: buildStatCard(
                           title: "Users",
@@ -182,7 +182,6 @@ class AdminDashboard extends StatelessWidget {
                           collection: "scholarships",
                         ),
                       ),
-
                     ],
                   ),
 
@@ -190,7 +189,6 @@ class AdminDashboard extends StatelessWidget {
 
                   Row(
                     children: [
-
                       Expanded(
                         child: buildStatCard(
                           title: "Applications",
@@ -210,7 +208,6 @@ class AdminDashboard extends StatelessWidget {
                           collection: "sponsors",
                         ),
                       ),
-
                     ],
                   ),
 
@@ -222,10 +219,8 @@ class AdminDashboard extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 20),
-
                   Row(
                     children: [
-
                       Expanded(
                         child: _NavCard(
                           icon: Icons.people,
@@ -235,8 +230,7 @@ class AdminDashboard extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                const ManageStudentsScreen(),
+                                builder: (_) => const ManageStudentsScreen(),
                               ),
                             );
                           },
@@ -261,14 +255,13 @@ class AdminDashboard extends StatelessWidget {
                           },
                         ),
                       ),
-
                     ],
                   ),
+
                   const SizedBox(height: 15),
 
                   Row(
                     children: [
-
                       Expanded(
                         child: _NavCard(
                           icon: Icons.school,
@@ -304,7 +297,6 @@ class AdminDashboard extends StatelessWidget {
                           },
                         ),
                       ),
-
                     ],
                   ),
 
@@ -319,7 +311,6 @@ class AdminDashboard extends StatelessWidget {
 
                   Row(
                     children: [
-
                       Expanded(
                         child: _ActionCard(
                           icon: Icons.analytics,
@@ -354,10 +345,8 @@ class AdminDashboard extends StatelessWidget {
                           },
                         ),
                       ),
-
                     ],
                   ),
-
                 ],
               ),
             ),
@@ -368,8 +357,7 @@ class AdminDashboard extends StatelessWidget {
   }
 }
 
-class _NavCard extends StatelessWidget {
-
+class _NavCard extends StatefulWidget {
   final IconData icon;
   final String title;
   final Color accent;
@@ -383,50 +371,69 @@ class _NavCard extends StatelessWidget {
   });
 
   @override
+  State<_NavCard> createState() => _NavCardState();
+}
+
+class _NavCardState extends State<_NavCard> {
+  bool isHover = false;
+
+  @override
   Widget build(BuildContext context) {
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-
-      child: Container(
-        height: 110,
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(.05),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => isHover = true),
+      onExit: (_) => setState(() => isHover = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          height: 115,
+          transform: Matrix4.identity()
+            ..scale(isHover ? 1.04 : 1.0),
+          decoration: BoxDecoration(
+            color: isHover
+                ? widget.accent.withOpacity(0.08)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: isHover
+                  ? widget.accent
+                  : widget.accent.withOpacity(.18),
+              width: isHover ? 2 : 1.5,
             ),
-          ],
-        ),
-
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: accent.withOpacity(.15),
-              child: Icon(
-                icon,
-                color: accent,
+            boxShadow: [
+              BoxShadow(
+                color: widget.accent.withOpacity(
+                  isHover ? .30 : .12,
+                ),
+                blurRadius: isHover ? 25 : 18,
+                spreadRadius: isHover ? 3 : 2,
+                offset: const Offset(0, 8),
               ),
-            ),
-
-            const SizedBox(height: 12),
-
-            Text(
-              title,
-              style: AppTextStyles.subtitle.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: widget.accent.withOpacity(.12),
+                child: Icon(
+                  widget.icon,
+                  color: widget.accent,
+                  size: 30,
+                ),
               ),
-            ),
-
-          ],
+              const SizedBox(height: 12),
+              Text(
+                widget.title,
+                style: AppTextStyles.subtitle.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -434,7 +441,6 @@ class _NavCard extends StatelessWidget {
 }
 
 class _ActionCard extends StatelessWidget {
-
   final IconData icon;
   final String title;
   final Color accent;
@@ -449,35 +455,37 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-
+      borderRadius: BorderRadius.circular(22),
       child: Container(
-        height: 110,
+        height: 115,
         decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(18),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: accent.withOpacity(.18),
+            width: 1.5,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(.05),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
+              color: accent.withOpacity(.12),
+              blurRadius: 18,
+              spreadRadius: 2,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-
             CircleAvatar(
-              radius: 24,
-              backgroundColor: accent.withOpacity(.15),
+              radius: 28,
+              backgroundColor: accent.withOpacity(.12),
               child: Icon(
                 icon,
                 color: accent,
+                size: 30,
               ),
             ),
 
@@ -490,7 +498,6 @@ class _ActionCard extends StatelessWidget {
                 color: AppColors.textPrimary,
               ),
             ),
-
           ],
         ),
       ),
