@@ -2,9 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'edit_scholarship_screen.dart';
 
-class ManageScholarshipScreen extends StatelessWidget {
+class ManageScholarshipScreen extends StatefulWidget {
   const ManageScholarshipScreen({super.key});
+
+  @override
+  State<ManageScholarshipScreen> createState() =>
+      _ManageScholarshipScreenState();
+}
+
+class _ManageScholarshipScreenState
+    extends State<ManageScholarshipScreen> {
 
   @override
   Widget build(BuildContext context) {
@@ -20,61 +30,56 @@ class ManageScholarshipScreen extends StatelessWidget {
         ),
         iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text(
-            "My Scholarships",
-            style: AppTextStyles.title.copyWith(fontSize: 22, color: AppColors.textPrimary),
-          ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection("scholarships")
+            .snapshots(),
+        builder: (context, snapshot) {
 
-          const SizedBox(height: 6),
+          if (snapshot.connectionState ==
+              ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
 
-          Text(
-            "Manage your published scholarships",
-            style: AppTextStyles.subtitle,
-          ),
+          if (!snapshot.hasData ||
+              snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Text("No Scholarships Found"),
+            );
+          }
 
-          const SizedBox(height: 22),
+          final docs = snapshot.data!.docs;
 
-          _buildScholarshipCard(
-            context,
-            title: "Government Scholarship",
-            amount: "₹25,000",
-            deadline: "30 Aug 2026",
-            accent: AppColors.primary,
-          ),
+          return ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
 
-          const SizedBox(height: 16),
+              final doc = docs[index];
 
-          _buildScholarshipCard(
-            context,
-            title: "Merit Scholarship",
-            amount: "₹50,000",
-            deadline: "15 Sep 2026",
-            accent: AppColors.secondary,
-          ),
+              final data =
+              doc.data() as Map<String, dynamic>;
 
-          const SizedBox(height: 16),
+              return _buildScholarshipCard(
+                context,
+                documentId: doc.id,
+                scholarship: data,
+              );
 
-          _buildScholarshipCard(
-            context,
-            title: "Sports Scholarship",
-            amount: "₹30,000",
-            deadline: "05 Oct 2026",
-            accent: AppColors.success,
-          ),
-        ],
+            },
+          );
+
+        },
       ),
     );
   }
 
   Widget _buildScholarshipCard(
       BuildContext context, {
-        required String title,
-        required String amount,
-        required String deadline,
-        required Color accent,
+        required String documentId,
+        required Map<String, dynamic> scholarship,
       }) {
     return Container(
       decoration: BoxDecoration(
@@ -94,7 +99,7 @@ class ManageScholarshipScreen extends StatelessWidget {
           Container(
             height: 5,
             decoration: BoxDecoration(
-              color: accent,
+              color: AppColors.primary,
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(20),
                 topRight: Radius.circular(20),
@@ -107,7 +112,7 @@ class ManageScholarshipScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  scholarship["title"],
                   style: AppTextStyles.subtitle.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.bold,
@@ -122,7 +127,7 @@ class ManageScholarshipScreen extends StatelessWidget {
                     Icon(Icons.currency_rupee_rounded, size: 15, color: AppColors.textSecondary),
                     const SizedBox(width: 4),
                     Text(
-                      amount,
+                      scholarship["amount"],
                       style: AppTextStyles.subtitle.copyWith(
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w600,
@@ -133,7 +138,7 @@ class ManageScholarshipScreen extends StatelessWidget {
                     Icon(Icons.calendar_today_rounded, size: 13, color: AppColors.textSecondary),
                     const SizedBox(width: 4),
                     Text(
-                      deadline,
+                      scholarship["deadline"],
                       style: AppTextStyles.subtitle.copyWith(fontSize: 13),
                     ),
                   ],
@@ -146,8 +151,14 @@ class ManageScholarshipScreen extends StatelessWidget {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Edit Feature Coming Soon ✏️")),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EditScholarshipScreen(
+                                documentId: documentId,
+                                scholarship: scholarship,
+                              ),
+                            ),
                           );
                         },
                         icon: Icon(Icons.edit_rounded, size: 17, color: AppColors.primary),
@@ -164,10 +175,50 @@ class ManageScholarshipScreen extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Delete Feature Coming Soon 🗑️")),
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) {
+                              return AlertDialog(
+                                title: const Text("Delete Scholarship"),
+                                content: const Text(
+                                  "Are you sure you want to delete this scholarship?",
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context, false);
+                                    },
+                                    child: const Text("Cancel"),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                    ),
+                                    onPressed: () {
+                                      Navigator.pop(context, true);
+                                    },
+                                    child: const Text("Delete"),
+                                  ),
+                                ],
+                              );
+                            },
                           );
+
+                          if (confirm == true) {
+                            await FirebaseFirestore.instance
+                                .collection("scholarships")
+                                .doc(documentId)
+                                .delete();
+
+                            if (!context.mounted) return;
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Scholarship Deleted Successfully 🗑️"),
+                              ),
+                            );
+                          }
                         },
                         icon: const Icon(Icons.delete_rounded, size: 17),
                         label: const Text("Delete"),

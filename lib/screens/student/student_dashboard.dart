@@ -5,7 +5,6 @@ import '../../core/constants/app_text_styles.dart';
 import 'search_screen.dart';
 import 'application_screen.dart';
 import 'profile_screen.dart';
-import 'my_applications_screen.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -57,7 +56,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 ],
               ),
 
-              const SizedBox(height: 56),
+              const SizedBox(height: 30),
 
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -122,41 +121,53 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 14,
-                  mainAxisSpacing: 14,
-                  childAspectRatio: 1.4,
-                  children: [
-                    _QuickAction(
-                      icon: Icons.assignment_rounded,
-                      title: "My Applications",
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const ApplicationScreen()),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 600;
+                    final crossAxisCount = isWide ? 4 : 2;
+
+                    final actions = [
+                      _QuickAction(
+                        icon: Icons.assignment_rounded,
+                        title: "My Applications",
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ApplicationScreen()),
+                        ),
                       ),
-                    ),
-                    _QuickAction(
-                      icon: Icons.person_rounded,
-                      title: "My Profile",
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                      _QuickAction(
+                        icon: Icons.person_rounded,
+                        title: "My Profile",
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                        ),
                       ),
-                    ),
-                    _QuickAction(
-                      icon: Icons.favorite_rounded,
-                      title: "Saved",
-                      onTap: () {},
-                    ),
-                    _QuickAction(
-                      icon: Icons.support_agent_rounded,
-                      title: "Support",
-                      onTap: () {},
-                    ),
-                  ],
+                      _QuickAction(
+                        icon: Icons.favorite_rounded,
+                        title: "Saved",
+                        onTap: () {},
+                      ),
+                      _QuickAction(
+                        icon: Icons.support_agent_rounded,
+                        title: "Support",
+                        onTap: () {},
+                      ),
+                    ];
+
+                    return GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: actions.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 14,
+                        mainAxisSpacing: 14,
+                        mainAxisExtent: 76,
+                      ),
+                      itemBuilder: (context, index) => actions[index],
+                    );
+                  },
                 ),
               ),
 
@@ -227,58 +238,79 @@ class _GradientHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 46),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primary.withOpacity(0.85)],
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final size = MediaQuery.of(context).size;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.primary, AppColors.primary.withOpacity(0.85)],
+            ),
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(32),
+              bottomRight: Radius.circular(32),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "Hi, $userName 👋",
-                style: AppTextStyles.title.copyWith(color: Colors.white, fontSize: 22),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Hi, $userName 👋",
+                    style: AppTextStyles.title.copyWith(color: Colors.white, fontSize: 22),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Let's find your next opportunity",
+                    style: AppTextStyles.subtitle.copyWith(color: Colors.white.withOpacity(0.75)),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                "Let's find your next opportunity",
-                style: AppTextStyles.subtitle.copyWith(color: Colors.white.withOpacity(0.75)),
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.secondary, width: 2),
+                ),
+                child: CircleAvatar(
+                  radius: 21,
+                  backgroundColor: AppColors.secondary,
+                  child: Text(
+                    userName.isNotEmpty ? userName[0].toUpperCase() : "?",
+                    style: AppTextStyles.subtitle.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.all(2),
+        ),
+
+        // Soft decorative circle — same treatment as splash/role screens
+        Positioned(
+          top: -size.width * 0.15,
+          right: -size.width * 0.18,
+          child: Container(
+            width: size.width * 0.5,
+            height: size.width * 0.5,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.secondary, width: 2),
-            ),
-            child: CircleAvatar(
-              radius: 21,
-              backgroundColor: AppColors.secondary,
-              child: Text(
-                userName.isNotEmpty ? userName[0].toUpperCase() : "?",
-                style: AppTextStyles.subtitle.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
+              color: AppColors.secondary.withOpacity(0.10),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -352,51 +384,65 @@ class _StatsGrid extends StatelessWidget {
       (icon: Icons.workspace_premium_rounded, title: "Eligible", value: "35", color: AppColors.secondary),
     ];
 
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 14,
-      mainAxisSpacing: 14,
-      childAspectRatio: 1.5,
-      children: stats.map((s) {
-        final radius = BorderRadius.circular(18);
-        return _TapFeedback(
-          borderRadius: radius,
-          onTap: () {},
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: radius,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: s.color.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(s.icon, size: 18, color: s.color),
-                ),
-                const Spacer(),
-                Text(s.value, style: AppTextStyles.title.copyWith(fontSize: 20, color: AppColors.textPrimary)),
-                Text(s.title, style: AppTextStyles.subtitle.copyWith(fontSize: 12)),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Phone → 2 columns. Wider windows (tablet/desktop) → 4 in a row.
+        final isWide = constraints.maxWidth >= 600;
+        final crossAxisCount = isWide ? 4 : 2;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: stats.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+            // Fixed height regardless of card width — this is what stops
+            // the huge empty gap from appearing on wide (desktop) screens.
+            mainAxisExtent: 118,
           ),
+          itemBuilder: (context, index) {
+            final s = stats[index];
+            final radius = BorderRadius.circular(18);
+            return _TapFeedback(
+              borderRadius: radius,
+              onTap: () {},
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: radius,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: s.color.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(s.icon, size: 18, color: s.color),
+                    ),
+                    Text(s.value, style: AppTextStyles.title.copyWith(fontSize: 20, color: AppColors.textPrimary)),
+                    Text(s.title, style: AppTextStyles.subtitle.copyWith(fontSize: 12)),
+                  ],
+                ),
+              ),
+            );
+          },
         );
-      }).toList(),
+      },
     );
   }
 }
@@ -542,6 +588,7 @@ class _QuickAction extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
+        alignment: Alignment.centerLeft,
         decoration: BoxDecoration(
           color: AppColors.card,
           borderRadius: radius,

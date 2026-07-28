@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
@@ -10,64 +11,97 @@ class ManageStudentsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
         centerTitle: true,
         title: Text(
           "Manage Students",
-          style: AppTextStyles.title.copyWith(fontSize: 18, color: AppColors.textPrimary),
+          style: AppTextStyles.title.copyWith(
+            fontSize: 18,
+            color: AppColors.textPrimary,
+          ),
         ),
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
+        iconTheme: IconThemeData(
+          color: AppColors.textPrimary,
+        ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text(
-            "Registered Students",
-            style: AppTextStyles.title.copyWith(fontSize: 22, color: AppColors.textPrimary),
-          ),
 
-          const SizedBox(height: 6),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection("users")
+            .where("role", isEqualTo: "student")
+            .snapshots(),
 
-          Text(
-            "View and manage all registered students.",
-            style: AppTextStyles.subtitle,
-          ),
+        builder: (context, snapshot) {
 
-          const SizedBox(height: 22),
+          if (snapshot.connectionState ==
+              ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
 
-          _buildStudentCard(
-            context,
-            name: "Vinothini",
-            email: "vinothini@gmail.com",
-            college: "P.K.R Arts College",
-          ),
+          if (!snapshot.hasData ||
+              snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Text("No Students Found"),
+            );
+          }
 
-          const SizedBox(height: 16),
+          final students = snapshot.data!.docs;
 
-          _buildStudentCard(
-            context,
-            name: "Rahul",
-            email: "rahul@gmail.com",
-            college: "ABC Engineering College",
-          ),
+          return ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
 
-          const SizedBox(height: 16),
+              Text(
+                "Registered Students",
+                style: AppTextStyles.title.copyWith(
+                  fontSize: 22,
+                  color: AppColors.textPrimary,
+                ),
+              ),
 
-          _buildStudentCard(
-            context,
-            name: "Priya",
-            email: "priya@gmail.com",
-            college: "XYZ College",
-          ),
-        ],
+              const SizedBox(height: 6),
+
+              Text(
+                "View and manage all registered students.",
+                style: AppTextStyles.subtitle,
+              ),
+
+              const SizedBox(height: 22),
+
+              ...students.map((student) {
+
+                final data =
+                student.data() as Map<String, dynamic>;
+
+                return Padding(
+                  padding:
+                  const EdgeInsets.only(bottom: 16),
+
+                  child: _buildStudentCard(
+                    context,
+                    documentId: student.id,
+                    name: data["name"] ?? "",
+                    email: data["email"] ?? "",
+                    college: data["college"] ?? "",
+                  ),
+                );
+
+              }).toList(),
+
+            ],
+          );
+        },
       ),
     );
   }
-
   Widget _buildStudentCard(
       BuildContext context, {
+        required String documentId,
         required String name,
         required String email,
         required String college,
@@ -88,6 +122,7 @@ class ManageStudentsScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+
           Row(
             children: [
               Container(
@@ -100,11 +135,16 @@ class ManageStudentsScreen extends StatelessWidget {
                 child: Center(
                   child: Text(
                     name.isNotEmpty ? name[0].toUpperCase() : "?",
-                    style: AppTextStyles.title.copyWith(color: AppColors.primary, fontSize: 18),
+                    style: AppTextStyles.title.copyWith(
+                      color: AppColors.primary,
+                      fontSize: 18,
+                    ),
                   ),
                 ),
               ),
+
               const SizedBox(width: 14),
+
               Expanded(
                 child: Text(
                   name,
@@ -122,13 +162,16 @@ class ManageStudentsScreen extends StatelessWidget {
 
           Row(
             children: [
-              Icon(Icons.email_rounded, size: 15, color: AppColors.textSecondary),
+              Icon(
+                Icons.email_rounded,
+                size: 15,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 5),
               Expanded(
                 child: Text(
                   email,
                   style: AppTextStyles.subtitle.copyWith(fontSize: 13),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -138,13 +181,16 @@ class ManageStudentsScreen extends StatelessWidget {
 
           Row(
             children: [
-              Icon(Icons.school_rounded, size: 15, color: AppColors.textSecondary),
+              Icon(
+                Icons.school_rounded,
+                size: 15,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 5),
               Expanded(
                 child: Text(
                   college,
                   style: AppTextStyles.subtitle.copyWith(fontSize: 13),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -154,17 +200,48 @@ class ManageStudentsScreen extends StatelessWidget {
 
           Row(
             children: [
+
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Viewing $name Profile 👤")),
+                    showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text("Student Details"),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("👤 Name : $name"),
+                            const SizedBox(height: 8),
+                            Text("📧 Email : $email"),
+                            const SizedBox(height: 8),
+                            Text("🎓 College : $college"),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Close"),
+                          ),
+                        ],
+                      ),
                     );
                   },
-                  icon: Icon(Icons.visibility_rounded, size: 17, color: AppColors.primary),
-                  label: Text("View", style: TextStyle(color: AppColors.primary)),
+                  icon: Icon(
+                    Icons.visibility_rounded,
+                    size: 17,
+                    color: AppColors.primary,
+                  ),
+                  label: Text(
+                    "View",
+                    style: TextStyle(color: AppColors.primary),
+                  ),
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: AppColors.primary, width: 1.4),
+                    side: BorderSide(
+                      color: AppColors.primary,
+                      width: 1.4,
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -172,13 +249,55 @@ class ManageStudentsScreen extends StatelessWidget {
                   ),
                 ),
               ),
+
               const SizedBox(width: 12),
+
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("$name Removed Successfully 🗑️")),
+                  onPressed: () async {
+
+                    bool? confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text("Remove Student"),
+                        content: Text(
+                          "Are you sure you want to remove $name?",
+                        ),
+                        actions: [
+
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.pop(context, false),
+                            child: const Text("Cancel"),
+                          ),
+
+                          ElevatedButton(
+                            onPressed: () =>
+                                Navigator.pop(context, true),
+                            child: const Text("Remove"),
+                          ),
+
+                        ],
+                      ),
                     );
+
+                    if (confirm == true) {
+
+                      await FirebaseFirestore.instance
+                          .collection("users")
+                          .doc(documentId)
+                          .delete();
+
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              "$name removed successfully 🗑️",
+                            ),
+                          ),
+                        );
+                      }
+                    }
                   },
                   icon: const Icon(Icons.delete_rounded, size: 17),
                   label: const Text("Remove"),
@@ -193,8 +312,10 @@ class ManageStudentsScreen extends StatelessWidget {
                   ),
                 ),
               ),
+
             ],
           ),
+
         ],
       ),
     );

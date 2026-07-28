@@ -57,7 +57,6 @@ class DefaultFirebaseOptions {
     projectId: 'scholarship-sponser-finder',
     storageBucket: 'scholarship-sponser-finder.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAQD4lha0nKSMWmnQUF_Mu4sq2nMH2SDtM',
     appId: '1:984935343154:ios:bf8c3eca35dce4ddb1482b',
@@ -67,7 +66,6 @@ class DefaultFirebaseOptions {
     iosClientId: '984935343154-m2mjro1ovq76usfh58ggdc0545s6ckfk.apps.googleusercontent.com',
     iosBundleId: 'com.example.scholarshipSponserConnectPlatform',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyAQD4lha0nKSMWmnQUF_Mu4sq2nMH2SDtM',
     appId: '1:984935343154:ios:bf8c3eca35dce4ddb1482b',
