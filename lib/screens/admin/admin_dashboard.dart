@@ -34,65 +34,14 @@ class AdminDashboard extends StatelessWidget {
           .collection(collection)
           .snapshots(),
       builder: (context, snapshot) {
-        int count = 0;
+        int count = snapshot.hasData ? snapshot.data!.docs.length : 0;
 
-        if (snapshot.hasData) {
-          count = snapshot.data!.docs.length;
-        }
-
-        return Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: color.withOpacity(.15),
-              width: 1.4,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(.12),
-                blurRadius: 18,
-                spreadRadius: 2,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: color.withOpacity(.12),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 30,
-                ),
-              ),
-
-              const SizedBox(height: 15),
-
-              Text(
-                count.toString(),
-                style: AppTextStyles.title.copyWith(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-
-              const SizedBox(height: 6),
-
-              Text(
-                title,
-                style: AppTextStyles.subtitle.copyWith(
-                  color: Colors.grey.shade700,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
+        return _HoverCard(
+          icon: icon,
+          title: title,
+          value: count.toString(),
+          accent: color,
+          onTap: () {},
         );
       },
     );
@@ -106,6 +55,7 @@ class AdminDashboard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(
@@ -129,6 +79,7 @@ class AdminDashboard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+
                   Text(
                     "Welcome Admin 👋",
                     style: AppTextStyles.subtitle.copyWith(
@@ -154,6 +105,7 @@ class AdminDashboard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+
                   Text(
                     "Dashboard Overview",
                     style: AppTextStyles.title,
@@ -163,6 +115,7 @@ class AdminDashboard extends StatelessWidget {
 
                   Row(
                     children: [
+
                       Expanded(
                         child: buildStatCard(
                           title: "Users",
@@ -182,6 +135,7 @@ class AdminDashboard extends StatelessWidget {
                           collection: "scholarships",
                         ),
                       ),
+
                     ],
                   ),
 
@@ -189,6 +143,7 @@ class AdminDashboard extends StatelessWidget {
 
                   Row(
                     children: [
+
                       Expanded(
                         child: buildStatCard(
                           title: "Applications",
@@ -208,6 +163,7 @@ class AdminDashboard extends StatelessWidget {
                           collection: "sponsors",
                         ),
                       ),
+
                     ],
                   ),
 
@@ -222,7 +178,7 @@ class AdminDashboard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: _NavCard(
+                        child: _HoverCard(
                           icon: Icons.people,
                           title: "Students",
                           accent: AppColors.primary,
@@ -230,7 +186,8 @@ class AdminDashboard extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const ManageStudentsScreen(),
+                                builder: (_) =>
+                                const ManageStudentsScreen(),
                               ),
                             );
                           },
@@ -240,7 +197,7 @@ class AdminDashboard extends StatelessWidget {
                       const SizedBox(width: 15),
 
                       Expanded(
-                        child: _NavCard(
+                        child: _HoverCard(
                           icon: Icons.business,
                           title: "Sponsors",
                           accent: AppColors.success,
@@ -263,7 +220,7 @@ class AdminDashboard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: _NavCard(
+                        child: _HoverCard(
                           icon: Icons.school,
                           title: "Scholarships",
                           accent: AppColors.secondary,
@@ -282,7 +239,7 @@ class AdminDashboard extends StatelessWidget {
                       const SizedBox(width: 15),
 
                       Expanded(
-                        child: _NavCard(
+                        child: _HoverCard(
                           icon: Icons.assignment,
                           title: "Applications",
                           accent: AppColors.error,
@@ -312,7 +269,7 @@ class AdminDashboard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: _ActionCard(
+                        child: _HoverCard(
                           icon: Icons.analytics,
                           title: "Reports",
                           accent: Colors.deepPurple,
@@ -320,7 +277,8 @@ class AdminDashboard extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const ReportsScreen(),
+                                builder: (_) =>
+                                const ReportsScreen(),
                               ),
                             );
                           },
@@ -330,7 +288,7 @@ class AdminDashboard extends StatelessWidget {
                       const SizedBox(width: 15),
 
                       Expanded(
-                        child: _ActionCard(
+                        child: _HoverCard(
                           icon: Icons.settings,
                           title: "Settings",
                           accent: Colors.teal,
@@ -356,25 +314,27 @@ class AdminDashboard extends StatelessWidget {
     );
   }
 }
-
-class _NavCard extends StatefulWidget {
+class _HoverCard extends StatefulWidget {
   final IconData icon;
   final String title;
+  final String? value;
   final Color accent;
   final VoidCallback onTap;
 
-  const _NavCard({
+  const _HoverCard({
+    super.key,
     required this.icon,
     required this.title,
+    this.value,
     required this.accent,
     required this.onTap,
   });
 
   @override
-  State<_NavCard> createState() => _NavCardState();
+  State<_HoverCard> createState() => _HoverCardState();
 }
 
-class _NavCardState extends State<_NavCard> {
+class _HoverCardState extends State<_HoverCard> {
   bool isHover = false;
 
   @override
@@ -387,33 +347,34 @@ class _NavCardState extends State<_NavCard> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 250),
-          height: 115,
+          curve: Curves.easeInOut,
+          height: 150,
           transform: Matrix4.identity()
-            ..scale(isHover ? 1.04 : 1.0),
+            ..scale(isHover ? 1.05 : 1.0),
           decoration: BoxDecoration(
             color: isHover
-                ? widget.accent.withOpacity(0.08)
+                ? widget.accent.withOpacity(0.12)
                 : Colors.white,
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
               color: isHover
                   ? widget.accent
                   : widget.accent.withOpacity(.18),
-              width: isHover ? 2 : 1.5,
+              width: isHover ? 2 : 1.4,
             ),
             boxShadow: [
               BoxShadow(
                 color: widget.accent.withOpacity(
-                  isHover ? .30 : .12,
+                  isHover ? .35 : .12,
                 ),
-                blurRadius: isHover ? 25 : 18,
+                blurRadius: isHover ? 28 : 18,
                 spreadRadius: isHover ? 3 : 2,
                 offset: const Offset(0, 8),
               ),
             ],
           ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               CircleAvatar(
                 radius: 28,
@@ -424,9 +385,25 @@ class _NavCardState extends State<_NavCard> {
                   size: 30,
                 ),
               ),
-              const SizedBox(height: 12),
+
+              const SizedBox(height: 8),
+
+              if (widget.value != null)
+                Text(
+                  widget.value!,
+                  style: AppTextStyles.title.copyWith(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+
+              if (widget.value != null)
+                const SizedBox(height: 4),
+
               Text(
                 widget.title,
+                textAlign: TextAlign.center,
                 style: AppTextStyles.subtitle.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -434,71 +411,6 @@ class _NavCardState extends State<_NavCard> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final Color accent;
-  final VoidCallback onTap;
-
-  const _ActionCard({
-    required this.icon,
-    required this.title,
-    required this.accent,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(22),
-      child: Container(
-        height: 115,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: accent.withOpacity(.18),
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: accent.withOpacity(.12),
-              blurRadius: 18,
-              spreadRadius: 2,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: accent.withOpacity(.12),
-              child: Icon(
-                icon,
-                color: accent,
-                size: 30,
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            Text(
-              title,
-              style: AppTextStyles.subtitle.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
         ),
       ),
     );
