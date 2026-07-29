@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_text_styles.dart';
+
 class EditScholarshipScreen extends StatefulWidget {
   final String documentId;
   final Map<String, dynamic> scholarship;
@@ -12,41 +15,27 @@ class EditScholarshipScreen extends StatefulWidget {
   });
 
   @override
-  State<EditScholarshipScreen> createState() =>
-      _EditScholarshipScreenState();
+  State<EditScholarshipScreen> createState() => _EditScholarshipScreenState();
 }
 
-class _EditScholarshipScreenState
-    extends State<EditScholarshipScreen> {
+class _EditScholarshipScreenState extends State<EditScholarshipScreen> {
   late TextEditingController titleController;
   late TextEditingController amountController;
   late TextEditingController eligibilityController;
   late TextEditingController deadlineController;
   late TextEditingController descriptionController;
 
+  bool _isSaving = false;
+
   @override
   void initState() {
     super.initState();
 
-    titleController = TextEditingController(
-      text: widget.scholarship["title"] ?? "",
-    );
-
-    amountController = TextEditingController(
-      text: widget.scholarship["amount"] ?? "",
-    );
-
-    eligibilityController = TextEditingController(
-      text: widget.scholarship["eligibility"] ?? "",
-    );
-
-    deadlineController = TextEditingController(
-      text: widget.scholarship["deadline"] ?? "",
-    );
-
-    descriptionController = TextEditingController(
-      text: widget.scholarship["description"] ?? "",
-    );
+    titleController = TextEditingController(text: widget.scholarship["title"] ?? "");
+    amountController = TextEditingController(text: widget.scholarship["amount"] ?? "");
+    eligibilityController = TextEditingController(text: widget.scholarship["eligibility"] ?? "");
+    deadlineController = TextEditingController(text: widget.scholarship["deadline"] ?? "");
+    descriptionController = TextEditingController(text: widget.scholarship["description"] ?? "");
   }
 
   Future<void> _updateScholarship() async {
@@ -56,33 +45,35 @@ class _EditScholarshipScreenState
         deadlineController.text.trim().isEmpty ||
         descriptionController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please fill all fields"),
-        ),
+        const SnackBar(content: Text("Please fill all fields")),
       );
       return;
     }
 
-    await FirebaseFirestore.instance
-        .collection("scholarships")
-        .doc(widget.documentId)
-        .update({
-      "title": titleController.text.trim(),
-      "amount": amountController.text.trim(),
-      "eligibility": eligibilityController.text.trim(),
-      "deadline": deadlineController.text.trim(),
-      "description": descriptionController.text.trim(),
-    });
+    setState(() => _isSaving = true);
 
-    if (!mounted) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection("scholarships")
+          .doc(widget.documentId)
+          .update({
+        "title": titleController.text.trim(),
+        "amount": amountController.text.trim(),
+        "eligibility": eligibilityController.text.trim(),
+        "deadline": deadlineController.text.trim(),
+        "description": descriptionController.text.trim(),
+      });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Scholarship Updated Successfully 🎉"),
-      ),
-    );
+      if (!mounted) return;
 
-    Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Scholarship Updated Successfully 🎉")),
+      );
+
+      Navigator.pop(context);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -95,12 +86,24 @@ class _EditScholarshipScreenState
     super.dispose();
   }
 
-  InputDecoration fieldDecoration(String label, IconData icon) {
+  InputDecoration _fieldDecoration({required String label, required IconData icon}) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon),
+      labelStyle: AppTextStyles.subtitle.copyWith(fontSize: 14),
+      prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
+      filled: true,
+      fillColor: AppColors.card,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.15)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.15)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: AppColors.secondary, width: 1.6),
       ),
     );
   }
@@ -108,12 +111,16 @@ class _EditScholarshipScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2563EB),
-        foregroundColor: Colors.white,
-        title: const Text("Edit Scholarship"),
+        backgroundColor: AppColors.background,
+        elevation: 0,
         centerTitle: true,
+        title: Text(
+          "Edit Scholarship",
+          style: AppTextStyles.title.copyWith(fontSize: 18, color: AppColors.textPrimary),
+        ),
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -121,10 +128,8 @@ class _EditScholarshipScreenState
           children: [
             TextField(
               controller: titleController,
-              decoration: fieldDecoration(
-                "Scholarship Title",
-                Icons.school,
-              ),
+              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+              decoration: _fieldDecoration(label: "Scholarship Title", icon: Icons.school_rounded),
             ),
 
             const SizedBox(height: 18),
@@ -132,30 +137,24 @@ class _EditScholarshipScreenState
             TextField(
               controller: amountController,
               keyboardType: TextInputType.number,
-              decoration: fieldDecoration(
-                "Amount",
-                Icons.currency_rupee,
-              ),
+              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+              decoration: _fieldDecoration(label: "Amount", icon: Icons.currency_rupee_rounded),
             ),
 
             const SizedBox(height: 18),
 
             TextField(
               controller: eligibilityController,
-              decoration: fieldDecoration(
-                "Eligibility",
-                Icons.verified_user,
-              ),
+              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+              decoration: _fieldDecoration(label: "Eligibility", icon: Icons.verified_user_rounded),
             ),
 
             const SizedBox(height: 18),
 
             TextField(
               controller: deadlineController,
-              decoration: fieldDecoration(
-                "Deadline",
-                Icons.calendar_today,
-              ),
+              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+              decoration: _fieldDecoration(label: "Deadline", icon: Icons.calendar_today_rounded),
             ),
 
             const SizedBox(height: 18),
@@ -163,10 +162,9 @@ class _EditScholarshipScreenState
             TextField(
               controller: descriptionController,
               maxLines: 5,
-              decoration: fieldDecoration(
-                "Description",
-                Icons.description,
-              ),
+              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+              decoration: _fieldDecoration(label: "Description", icon: Icons.description_rounded)
+                  .copyWith(alignLabelWithHint: true),
             ),
 
             const SizedBox(height: 30),
@@ -175,18 +173,22 @@ class _EditScholarshipScreenState
               width: double.infinity,
               height: 55,
               child: ElevatedButton.icon(
-                onPressed: _updateScholarship,
-                icon: const Icon(Icons.save),
-                label: const Text(
+                onPressed: _isSaving ? null : _updateScholarship,
+                icon: _isSaving ? const SizedBox.shrink() : const Icon(Icons.save_rounded),
+                label: _isSaving
+                    ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                )
+                    : const Text(
                   "Save Changes",
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
+                  elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
                   ),
