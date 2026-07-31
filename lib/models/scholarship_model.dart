@@ -1,26 +1,40 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class ScholarshipModel {
   final String id;
   final String title;
-  final String amount;
   final String description;
-  final String deadline;
+  final String amount;
+  final String lastDate;
+  final String eligibility;
+  final String sponsorName;
 
   ScholarshipModel({
     required this.id,
     required this.title,
-    required this.amount,
     required this.description,
-    required this.deadline,
+    required this.amount,
+    required this.lastDate,
+    required this.eligibility,
+    required this.sponsorName,
   });
 
   factory ScholarshipModel.fromMap(
-      Map<String, dynamic> map, String id) {
+      Map<String, dynamic> map,
+      String id,
+      ) {
+    Timestamp? timestamp = map['lastDate'];
+
     return ScholarshipModel(
       id: id,
-      title: map["title"] ?? "",
-      amount: map["amount"] ?? "",
-      description: map["description"] ?? "",
-      deadline: map["deadline"] ?? "",
+      title: map['title'] ?? '',
+      description: map['description'] ?? '',
+      amount: map['amount'] ?? '',
+      lastDate: timestamp != null
+          ? "${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}"
+          : '',
+      eligibility: map['eligibility'] ?? '',
+      sponsorName: map['sponsorName'] ?? '',
     );
   }
 }

@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../models/application_model.dart';
+import '../../services/application_service.dart';
 
 class ApplicationScreen extends StatelessWidget {
-  const ApplicationScreen({super.key});
+  ApplicationScreen({super.key});
+
+  final ApplicationService _applicationService =
+  ApplicationService();
+
+  final String studentId = FirebaseAuth.instance.currentUser!.uid;
 
   @override
   Widget build(BuildContext context) {
@@ -20,35 +29,63 @@ class ApplicationScreen extends StatelessWidget {
         ),
         iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          ApplicationCard(
-            title: "Government Scholarship",
-            amount: "₹25,000",
-            status: "Under Review",
-            color: AppColors.warning,
+        body: StreamBuilder<List<ApplicationModel>>(
+          stream: _applicationService.getStudentApplications(
+            studentId,
           ),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState ==
+                ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
+            }
 
-          const SizedBox(height: 16),
+            if (!snapshot.hasData ||
+                snapshot.data!.isEmpty) {
+              return const Center(
+                child: Text(
+                  "No Applications Found",
+                ),
+              );
+            }
 
-          ApplicationCard(
-            title: "Merit Scholarship",
-            amount: "₹50,000",
-            status: "Approved",
-            color: AppColors.success,
-          ),
+            final applications = snapshot.data!;
 
-          const SizedBox(height: 16),
+            return ListView.builder(
+              padding: const EdgeInsets.all(20),
+              itemCount: applications.length,
+              itemBuilder: (context, index) {
+                final application = applications[index];
 
-          ApplicationCard(
-            title: "Sports Scholarship",
-            amount: "₹30,000",
-            status: "Rejected",
-            color: AppColors.error,
-          ),
-        ],
-      ),
+                Color statusColor;
+
+                switch (application.status) {
+                  case "Approved":
+                    statusColor = AppColors.success;
+                    break;
+
+                  case "Rejected":
+                    statusColor = AppColors.error;
+                    break;
+
+                  default:
+                    statusColor = AppColors.warning;
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: ApplicationCard(
+                    title: application.scholarshipTitle,
+                    amount: application.amount,
+                    status: application.status,
+                    color: statusColor,
+                  ),
+                );
+              },
+            );
+          },
+        ),
     );
   }
 }
@@ -59,7 +96,7 @@ class ApplicationCard extends StatelessWidget {
   final String status;
   final Color color;
 
-  const ApplicationCard({
+  ApplicationCard({
     super.key,
     required this.title,
     required this.amount,

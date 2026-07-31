@@ -16,7 +16,7 @@ class MyApplicationsScreen extends StatelessWidget {
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection("applications")
+            .collection("scholarships")
             .where(
           "studentId",
           isEqualTo: currentUser!.uid,

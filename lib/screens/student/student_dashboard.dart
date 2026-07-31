@@ -6,6 +6,8 @@ import '../../core/constants/app_text_styles.dart';
 import 'search_screen.dart';
 import 'application_screen.dart';
 import 'profile_screen.dart';
+import '../../models/scholarship_model.dart';
+import '../../services/scholarship_service.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -16,6 +18,9 @@ class StudentDashboard extends StatefulWidget {
 
 class _StudentDashboardState extends State<StudentDashboard> {
   int _navIndex = 0;
+
+  final ScholarshipService scholarshipService =
+  ScholarshipService();
 
   void _handleNavTap(int index) {
     if (index == _navIndex) return;
@@ -35,7 +40,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
       case 2:
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const ApplicationScreen()),
+          MaterialPageRoute(builder: (_) => ApplicationScreen()),
         );
         break;
 
@@ -90,39 +95,51 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
               const SizedBox(height: 18),
 
-              SizedBox(
-                height: 180,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  children: [
-                    _ScholarshipCard(
-                      title: "Government Scholarship",
-                      amount: "₹25,000",
-                      deadline: "30 Aug 2026",
-                      icon: Icons.account_balance,
-                      accent: AppColors.primary,
-                      onTap: () {},
-                    ),
-                    _ScholarshipCard(
-                      title: "Merit Scholarship",
-                      amount: "₹50,000",
-                      deadline: "15 Sep 2026",
-                      icon: Icons.workspace_premium,
-                      accent: AppColors.secondary,
-                      onTap: () {},
-                    ),
-                    _ScholarshipCard(
-                      title: "Sports Scholarship",
-                      amount: "₹30,000",
-                      deadline: "05 Oct 2026",
-                      icon: Icons.sports_soccer,
-                      accent: AppColors.success,
-                      onTap: () {},
-                    ),
-                  ],
-                ),
+            SizedBox(
+              height: 220,
+              child: StreamBuilder<List<ScholarshipModel>>(
+                stream: scholarshipService.getScholarships(),
+                builder: (context, snapshot) {
+
+                  if (snapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(
+                      child: Text("No Scholarships Available"),
+                    );
+                  }
+
+                  print("Documents Count: ${snapshot.data?.length}");
+
+                  final scholarships = snapshot.data!;
+
+                  return ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: scholarships.length,
+
+                    itemBuilder: (context, index) {
+
+                      final scholarship = scholarships[index];
+
+                      return _ScholarshipCard(
+                        title: scholarship.title,
+                        amount: scholarship.amount,
+                        deadline: scholarship.lastDate,
+                        icon: Icons.school,
+                        accent: AppColors.primary,
+                        onTap: () {},
+                      );
+                    },
+                  );
+                },
               ),
+            ),
 
               const SizedBox(height: 30),
 
@@ -147,7 +164,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const ApplicationScreen()),
+                            MaterialPageRoute(builder: (_) =>  ApplicationScreen()),
                           );
                         },
                       ),

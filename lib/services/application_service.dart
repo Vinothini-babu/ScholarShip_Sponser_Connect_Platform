@@ -1,41 +1,61 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../models/application_model.dart';
 
 class ApplicationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  /// Apply for Scholarship
+  Future<String> applyScholarship(
+      ApplicationModel application,
+      ) async {
+    try {
+      // Check if already applied
+      final existing = await _firestore
+          .collection("applications")
+          .where(
+        "studentId",
+        isEqualTo: application.studentId,
+      )
+          .where(
+        "scholarshipId",
+        isEqualTo: application.scholarshipId,
+      )
+          .get();
 
-  Future<void> applyScholarship({
-    required String scholarshipId,
-    required String scholarshipTitle,
-  }) async {
+      if (existing.docs.isNotEmpty) {
+        return "Already Applied";
+      }
 
-    final user = _auth.currentUser!;
+      // Save application
+      await _firestore
+          .collection("applications")
+          .add(application.toMap());
 
-    final studentDoc = await _firestore
-        .collection("users")
-        .doc(user.uid)
-        .get();
+      return "Success";
+    } catch (e) {
+      return e.toString();
+    }
+  }
 
-    final studentData = studentDoc.data()!;
+  Stream<List<ApplicationModel>> getStudentApplications(
+      String studentId,
+      ) {
+    return _firestore
+        .collection('applications')
+        .where('studentId', isEqualTo: studentId)
+        .orderBy(
+      'appliedAt',
+      descending: true,
+    )
+        .snapshots()
+        .map((snapshot) {
 
-    await _firestore.collection("applications").add({
+      print("Documents Found: ${snapshot.docs.length}");
 
-      "studentId": user.uid,
-      "studentName": studentData["name"],
-      "studentEmail": studentData["email"],
-      "studentMobile": studentData["mobile"],
-      "studentCollege": studentData["college"],
-
-      "scholarshipId": scholarshipId,
-      "scholarshipTitle": scholarshipTitle,
-
-      "status": "Pending",
-
-      "appliedAt": Timestamp.now(),
-
-    });
-
+      return snapshot.docs.map((doc) {
+        return ApplicationModel.fromMap(doc.data(), doc.id);
+      }).toList();
+    }
+    );
   }
 }

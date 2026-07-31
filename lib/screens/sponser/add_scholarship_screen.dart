@@ -1,5 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../../services/scholarship_service.dart';
+
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 
@@ -7,188 +8,300 @@ class AddScholarshipScreen extends StatefulWidget {
   const AddScholarshipScreen({super.key});
 
   @override
-  State<AddScholarshipScreen> createState() => _AddScholarshipScreenState();
+  State<AddScholarshipScreen> createState() =>
+      _AddScholarshipScreenState();
 }
 
-class _AddScholarshipScreenState extends State<AddScholarshipScreen> {
-  final ScholarshipService _scholarshipService = ScholarshipService();
+class _AddScholarshipScreenState
+    extends State<AddScholarshipScreen> {
 
-  final TextEditingController titleController = TextEditingController();
-  final TextEditingController amountController = TextEditingController();
-  final TextEditingController eligibilityController = TextEditingController();
-  final TextEditingController deadlineController = TextEditingController();
-  final TextEditingController descriptionController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
 
-  bool _isPublishing = false;
+  final titleController = TextEditingController();
+  final descriptionController = TextEditingController();
+  final amountController = TextEditingController();
+  final eligibilityController = TextEditingController();
+  final documentController = TextEditingController();
 
-  Future<void> _handlePublish() async {
-    if (titleController.text.isEmpty ||
-        amountController.text.isEmpty ||
-        descriptionController.text.isEmpty ||
-        deadlineController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill all required fields")),
-      );
-      return;
-    }
+  String? category;
+  DateTime? lastDate;
 
-    setState(() => _isPublishing = true);
+  bool isLoading = false;
 
-    try {
-      await _scholarshipService.addScholarship(
-        title: titleController.text.trim(),
-        amount: amountController.text.trim(),
-        description: descriptionController.text.trim(),
-        deadline: deadlineController.text.trim(),
-      );
+  final List<String> categories = [
+    "Government",
+    "Merit",
+    "Sports",
+    "Minority",
+    "Private",
+    "NGO",
+    "International",
+    "Education Loan",
+  ];
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Scholarship Published Successfully 🎉")),
-      );
-
-      titleController.clear();
-      amountController.clear();
-      eligibilityController.clear();
-      deadlineController.clear();
-      descriptionController.clear();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
-    } finally {
-      if (mounted) setState(() => _isPublishing = false);
-    }
-  }
-
-  InputDecoration _fieldDecoration({required String label, required IconData icon}) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: AppTextStyles.subtitle.copyWith(fontSize: 14),
-      prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
-      filled: true,
-      fillColor: AppColors.card,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.15)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.15)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: AppColors.secondary, width: 1.6),
-      ),
+  Future<void> pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2035),
     );
+
+    if (picked != null) {
+      setState(() {
+        lastDate = picked;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+
       appBar: AppBar(
-        backgroundColor: AppColors.background,
         elevation: 0,
-        centerTitle: true,
-        title: Text(
-          "Add Scholarship",
-          style: AppTextStyles.title.copyWith(fontSize: 18, color: AppColors.textPrimary),
-        ),
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        title: const Text("Add Scholarship"),
       ),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Publish New Scholarship",
-              style: AppTextStyles.title.copyWith(fontSize: 22, color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              "Fill the details below to publish a scholarship.",
-              style: AppTextStyles.subtitle,
-            ),
 
-            const SizedBox(height: 28),
+        child: Form(
+          key: _formKey,
 
-            TextField(
-              controller: titleController,
-              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-              decoration: _fieldDecoration(label: "Scholarship Title", icon: Icons.school_rounded),
-            ),
+          child: Column(
+            children: [
 
-            const SizedBox(height: 18),
-
-            TextField(
-              controller: amountController,
-              keyboardType: TextInputType.number,
-              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-              decoration: _fieldDecoration(label: "Scholarship Amount", icon: Icons.currency_rupee_rounded),
-            ),
-
-            const SizedBox(height: 18),
-
-            TextField(
-              controller: eligibilityController,
-              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-              decoration: _fieldDecoration(label: "Eligibility", icon: Icons.verified_user_rounded),
-            ),
-
-            const SizedBox(height: 18),
-
-            TextField(
-              controller: deadlineController,
-              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-              decoration: _fieldDecoration(label: "Application Deadline", icon: Icons.calendar_today_rounded),
-            ),
-
-            const SizedBox(height: 18),
-
-            TextField(
-              controller: descriptionController,
-              maxLines: 5,
-              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-              decoration: _fieldDecoration(label: "Scholarship Description", icon: Icons.description_rounded)
-                  .copyWith(alignLabelWithHint: true),
-            ),
-
-            const SizedBox(height: 30),
-
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton.icon(
-                onPressed: _isPublishing ? null : _handlePublish,
-                icon: _isPublishing
-                    ? const SizedBox.shrink()
-                    : const Icon(Icons.publish_rounded),
-                label: _isPublishing
-                    ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
-                )
-                    : const Text(
-                  "Publish Scholarship",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              TextFormField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  labelText: "Scholarship Title",
+                  prefixIcon: Icon(Icons.school),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return "Enter Scholarship Title";
+                  }
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 18),
+
+              TextFormField(
+                controller: descriptionController,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: "Description",
+                  prefixIcon: Icon(Icons.description),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return "Enter Description";
+                  }
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 18),
+
+              TextFormField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: "Scholarship Amount",
+                  prefixIcon: Icon(Icons.currency_rupee),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return "Enter Amount";
+                  }
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 18),
+
+              DropdownButtonFormField<String>(
+                value: category,
+                decoration: const InputDecoration(
+                  labelText: "Category",
+                  prefixIcon: Icon(Icons.category),
+                ),
+                items: categories
+                    .map(
+                      (item) => DropdownMenuItem(
+                    value: item,
+                    child: Text(item),
+                  ),
+                )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    category = value;
+                  });
+                },
+                validator: (value) {
+                  if (value == null) {
+                    return "Select Category";
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 18),
+
+              TextFormField(
+                controller: eligibilityController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: "Eligibility",
+                  prefixIcon: Icon(Icons.verified_user),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return "Enter Eligibility";
+                  }
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 18),
+
+              TextFormField(
+                controller: documentController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: "Required Documents",
+                  prefixIcon: Icon(Icons.description_outlined),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return "Enter Required Documents";
+                  }
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 20),
+
+              InkWell(
+                onTap: pickDate,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Colors.grey.shade400,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_month),
+
+                      const SizedBox(width: 12),
+
+                      Text(
+                        lastDate == null
+                            ? "Select Last Date"
+                            : "${lastDate!.day}/${lastDate!.month}/${lastDate!.year}",
+                        style: AppTextStyles.subtitle,
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
 
-            const SizedBox(height: 30),
-          ],
+              const SizedBox(height: 30),
+
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+
+                    if (!_formKey.currentState!.validate()) {
+                      return;
+                    }
+
+                    if (lastDate == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            "Please select last date",
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+
+                    setState(() {
+                      isLoading = true;
+                    });
+
+                    await FirebaseFirestore.instance
+                        .collection("scholarships")
+                        .add({
+                      "title": titleController.text.trim(),
+                      "description":
+                      descriptionController.text.trim(),
+                      "amount": amountController.text.trim(),
+                      "category": category,
+                      "eligibility":
+                      eligibilityController.text.trim(),
+                      "requiredDocuments":
+                      documentController.text.trim(),
+                      "lastDate": Timestamp.fromDate(lastDate!),
+                      "status": "Active",
+                      "createdAt":
+                      FieldValue.serverTimestamp(),
+                    });
+
+                    setState(() {
+                      isLoading = false;
+                    });
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          "Scholarship Published Successfully 🎉",
+                        ),
+                      ),
+                    );
+
+                    Navigator.pop(context);
+                  },
+                  child: isLoading
+                      ? const CircularProgressIndicator(
+                    color: Colors.white,
+                  )
+                      : const Text(
+                    "Publish Scholarship",
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -197,10 +310,10 @@ class _AddScholarshipScreenState extends State<AddScholarshipScreen> {
   @override
   void dispose() {
     titleController.dispose();
+    descriptionController.dispose();
     amountController.dispose();
     eligibilityController.dispose();
-    deadlineController.dispose();
-    descriptionController.dispose();
+    documentController.dispose();
     super.dispose();
   }
 }

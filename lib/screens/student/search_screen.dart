@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../../services/scholarship_service.dart';
 import '../../models/scholarship_model.dart';
 import '../../services/application_service.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../models/application_model.dart';
+
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -93,7 +98,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         id: scholarship.id,
                         title: scholarship.title,
                         amount: scholarship.amount,
-                        deadline: scholarship.deadline,
+                        deadline: scholarship.lastDate,
                         icon: Icons.school_rounded,
                         applicationService: _applicationService,
                       );
@@ -137,23 +142,49 @@ class _ScholarshipTileState extends State<_ScholarshipTile> {
 
   Future<void> _handleApply() async {
     setState(() => _isApplying = true);
+
     try {
-      await widget.applicationService.applyScholarship(
+      final user = FirebaseAuth.instance.currentUser!;
+      final application = ApplicationModel(
+        id: "",
+        studentId: user.uid,
+        studentName: user.displayName ?? "Vinothini",
+        studentEmail: user.email ?? "", // Temporary
         scholarshipId: widget.id,
         scholarshipTitle: widget.title,
+        amount: widget.amount,
+        status: "Pending",
+        appliedAt: Timestamp.now(),
+      );
+
+      final result =
+      await widget.applicationService.applyScholarship(
+        application,
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Application Submitted Successfully 🎉")),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+
+      if (result == "Already Applied") {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("⚠️ Already Applied"),
+          ),
+        );
+      } else if (result == "Success") {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("🎉 Application Submitted Successfully"),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result)),
+        );
+      }
     } finally {
-      if (mounted) setState(() => _isApplying = false);
+      if (mounted) {
+        setState(() => _isApplying = false);
+      }
     }
   }
 
