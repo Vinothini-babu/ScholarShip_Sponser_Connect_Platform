@@ -62,6 +62,8 @@ class _ManageScholarshipScreenState
               final data =
               doc.data() as Map<String, dynamic>;
 
+              debugPrint(data.toString());
+
               return _buildScholarshipCard(
                 context,
                 documentId: doc.id,
@@ -138,7 +140,11 @@ class _ManageScholarshipScreenState
                     Icon(Icons.calendar_today_rounded, size: 13, color: AppColors.textSecondary),
                     const SizedBox(width: 4),
                     Text(
-                      scholarship["deadline"],
+                      scholarship["lastDate"] != null
+                          ? "${(scholarship["lastDate"] as Timestamp).toDate().day}/"
+                          "${(scholarship["lastDate"] as Timestamp).toDate().month}/"
+                          "${(scholarship["lastDate"] as Timestamp).toDate().year}"
+                          : "No Last Date",
                       style: AppTextStyles.subtitle.copyWith(fontSize: 13),
                     ),
                   ],

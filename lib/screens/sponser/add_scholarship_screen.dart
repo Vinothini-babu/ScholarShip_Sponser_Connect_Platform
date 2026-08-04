@@ -268,6 +268,7 @@ class _AddScholarshipScreenState
                       "requiredDocuments":
                       documentController.text.trim(),
                       "lastDate": Timestamp.fromDate(lastDate!),
+                      "sponsorName": "Sponsor",
                       "status": "Active",
                       "createdAt":
                       FieldValue.serverTimestamp(),
