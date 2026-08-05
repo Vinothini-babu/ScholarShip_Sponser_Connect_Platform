@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
@@ -255,6 +256,8 @@ class _AddScholarshipScreenState
                       isLoading = true;
                     });
 
+                    final user = FirebaseAuth.instance.currentUser;
+
                     await FirebaseFirestore.instance
                         .collection("scholarships")
                         .add({
@@ -270,6 +273,10 @@ class _AddScholarshipScreenState
                       "lastDate": Timestamp.fromDate(lastDate!),
                       "sponsorName": "Sponsor",
                       "status": "Active",
+
+                      "sponsorId": user!.uid,
+                      "sponsorEmail": user.email,
+
                       "createdAt":
                       FieldValue.serverTimestamp(),
                     });

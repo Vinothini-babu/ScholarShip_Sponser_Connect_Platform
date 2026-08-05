@@ -15,8 +15,10 @@ class ApplicationScreen extends StatelessWidget {
 
   final String studentId = FirebaseAuth.instance.currentUser!.uid;
 
+
   @override
   Widget build(BuildContext context) {
+    print("Logged in UID: $studentId");
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -34,6 +36,13 @@ class ApplicationScreen extends StatelessWidget {
             studentId,
           ),
           builder: (context, snapshot) {
+
+            if (snapshot.hasError) {
+              return Center(
+                child: Text(snapshot.error.toString()),
+              );
+            }
+
             if (snapshot.connectionState ==
                 ConnectionState.waiting) {
               return const Center(
@@ -41,16 +50,21 @@ class ApplicationScreen extends StatelessWidget {
               );
             }
 
-            if (!snapshot.hasData ||
-                snapshot.data!.isEmpty) {
+            if (!snapshot.hasData) {
               return const Center(
-                child: Text(
-                  "No Applications Found",
-                ),
+                child: Text("No Data"),
               );
             }
 
             final applications = snapshot.data!;
+
+            print("Applications Count = ${applications.length}");
+
+            if (applications.isEmpty) {
+              return const Center(
+                child: Text("No Applications Found"),
+              );
+            }
 
             return ListView.builder(
               padding: const EdgeInsets.all(20),
