@@ -256,29 +256,24 @@ class _AddScholarshipScreenState
                       isLoading = true;
                     });
 
-                    final user = FirebaseAuth.instance.currentUser;
+                    final user = FirebaseAuth.instance.currentUser!;
 
                     await FirebaseFirestore.instance
                         .collection("scholarships")
                         .add({
                       "title": titleController.text.trim(),
-                      "description":
-                      descriptionController.text.trim(),
+                      "description": descriptionController.text.trim(),
                       "amount": amountController.text.trim(),
                       "category": category,
-                      "eligibility":
-                      eligibilityController.text.trim(),
-                      "requiredDocuments":
-                      documentController.text.trim(),
+                      "eligibility": eligibilityController.text.trim(),
+                      "requiredDocuments": documentController.text.trim(),
                       "lastDate": Timestamp.fromDate(lastDate!),
-                      "sponsorName": "Sponsor",
+
+                      "sponsorId": user.uid,
+                      "sponsorName": user.email,
+
                       "status": "Active",
-
-                      "sponsorId": user!.uid,
-                      "sponsorEmail": user.email,
-
-                      "createdAt":
-                      FieldValue.serverTimestamp(),
+                      "createdAt": FieldValue.serverTimestamp(),
                     });
 
                     setState(() {

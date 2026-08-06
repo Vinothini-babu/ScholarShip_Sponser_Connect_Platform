@@ -100,6 +100,9 @@ class _SearchScreenState extends State<SearchScreen> {
                         amount: scholarship.amount,
                         deadline: scholarship.lastDate,
                         icon: Icons.school_rounded,
+
+                        sponsorId: scholarship.sponsorId,
+
                         applicationService: _applicationService,
                       );
                     },
@@ -114,14 +117,13 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 }
 
-/// Same StatefulWidget-per-tile so each card can hold its own
-/// "applying" loading state without rebuilding the whole list.
 class _ScholarshipTile extends StatefulWidget {
   final String id;
   final String title;
   final String amount;
   final String deadline;
   final IconData icon;
+  final String sponsorId;
   final ApplicationService applicationService;
 
   const _ScholarshipTile({
@@ -130,6 +132,9 @@ class _ScholarshipTile extends StatefulWidget {
     required this.amount,
     required this.deadline,
     required this.icon,
+
+    required this.sponsorId,
+
     required this.applicationService,
   });
 
@@ -149,7 +154,10 @@ class _ScholarshipTileState extends State<_ScholarshipTile> {
         id: "",
         studentId: user.uid,
         studentName: user.displayName ?? "Vinothini",
-        studentEmail: user.email ?? "", // Temporary
+        studentEmail: user.email ?? "",
+
+        sponsorId: widget.sponsorId,
+
         scholarshipId: widget.id,
         scholarshipTitle: widget.title,
         amount: widget.amount,

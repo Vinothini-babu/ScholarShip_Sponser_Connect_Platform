@@ -29,6 +29,11 @@ class ManageApplicationsScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection("applications")
+            .where(
+          "sponsorId",
+          isEqualTo: FirebaseAuth.instance.currentUser!.uid,
+        )
+            .orderBy("appliedAt", descending: true)
             .snapshots(),
         builder: (context, snapshot) {
 

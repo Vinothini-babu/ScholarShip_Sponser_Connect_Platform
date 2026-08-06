@@ -104,7 +104,7 @@ class SponsorDashboard extends StatelessWidget {
                           accent: AppColors.secondary,
                           onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const ManageScholarshipScreen()),
+                            MaterialPageRoute(builder: (_) => const ManageScholarshipsScreen()),
                           ),
                         ),
                       ),
