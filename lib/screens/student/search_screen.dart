@@ -9,7 +9,6 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../models/application_model.dart';
 
-
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
 
@@ -18,49 +17,95 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  final TextEditingController searchController = TextEditingController();
+  final TextEditingController searchController =
+  TextEditingController();
+
   final ScholarshipService _service = ScholarshipService();
-  final ApplicationService _applicationService = ApplicationService();
+
+  final ApplicationService _applicationService =
+  ApplicationService();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
         centerTitle: true,
         title: Text(
           "Search Scholarships",
-          style: AppTextStyles.title.copyWith(fontSize: 18, color: AppColors.textPrimary),
+          style: AppTextStyles.title.copyWith(
+            fontSize: 18,
+            color: AppColors.textPrimary,
+          ),
         ),
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
+        iconTheme: IconThemeData(
+          color: AppColors.textPrimary,
+        ),
       ),
+
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
+
         child: Column(
           children: [
+
             TextField(
               controller: searchController,
-              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+
+              style: AppTextStyles.subtitle.copyWith(
+                color: AppColors.textPrimary,
+                fontSize: 15,
+              ),
+
               decoration: InputDecoration(
                 hintText: "Search Scholarship...",
-                hintStyle: AppTextStyles.subtitle.copyWith(fontSize: 14),
-                prefixIcon: Icon(Icons.search_rounded, color: AppColors.textSecondary),
+
+                hintStyle:
+                AppTextStyles.subtitle.copyWith(
+                  fontSize: 14,
+                ),
+
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: AppColors.textSecondary,
+                ),
+
                 filled: true,
                 fillColor: AppColors.card,
-                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+
+                contentPadding:
+                const EdgeInsets.symmetric(
+                  vertical: 14,
+                ),
+
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.15)),
+                  borderRadius:
+                  BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: AppColors.textSecondary
+                        .withOpacity(0.15),
+                  ),
                 ),
+
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.15)),
+                  borderRadius:
+                  BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: AppColors.textSecondary
+                        .withOpacity(0.15),
+                  ),
                 ),
+
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: AppColors.secondary, width: 1.6),
+                  borderRadius:
+                  BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: AppColors.secondary,
+                    width: 1.6,
+                  ),
                 ),
               ),
             ),
@@ -68,42 +113,65 @@ class _SearchScreenState extends State<SearchScreen> {
             const SizedBox(height: 20),
 
             Expanded(
-              child: StreamBuilder<List<ScholarshipModel>>(
+              child:
+              StreamBuilder<List<ScholarshipModel>>(
                 stream: _service.getScholarships(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(
-                      child: CircularProgressIndicator(color: AppColors.primary),
-                    );
-                  }
 
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                builder: (context, snapshot) {
+
+                  if (snapshot.connectionState ==
+                      ConnectionState.waiting) {
                     return Center(
-                      child: Text(
-                        "No Scholarships Available",
-                        style: AppTextStyles.subtitle,
+                      child:
+                      CircularProgressIndicator(
+                        color: AppColors.primary,
                       ),
                     );
                   }
 
-                  final scholarships = snapshot.data!;
+                  if (!snapshot.hasData ||
+                      snapshot.data!.isEmpty) {
+                    return Center(
+                      child: Text(
+                        "No Scholarships Available",
+                        style:
+                        AppTextStyles.subtitle,
+                      ),
+                    );
+                  }
+
+                  final scholarships =
+                  snapshot.data!;
 
                   return ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    itemCount: scholarships.length,
-                    itemBuilder: (context, index) {
-                      final scholarship = scholarships[index];
+                    padding:
+                    const EdgeInsets.only(
+                      bottom: 20,
+                    ),
+
+                    itemCount:
+                    scholarships.length,
+
+                    itemBuilder:
+                        (context, index) {
+
+                      final scholarship =
+                      scholarships[index];
 
                       return _ScholarshipTile(
                         id: scholarship.id,
                         title: scholarship.title,
                         amount: scholarship.amount,
-                        deadline: scholarship.lastDate,
-                        icon: Icons.school_rounded,
+                        deadline:
+                        scholarship.lastDate,
+                        icon:
+                        Icons.school_rounded,
 
-                        sponsorId: scholarship.sponsorId,
+                        sponsorId:
+                        scholarship.sponsorId,
 
-                        applicationService: _applicationService,
+                        applicationService:
+                        _applicationService,
                       );
                     },
                   );
@@ -117,14 +185,18 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 }
 
-class _ScholarshipTile extends StatefulWidget {
+class _ScholarshipTile
+    extends StatefulWidget {
+
   final String id;
   final String title;
   final String amount;
   final String deadline;
   final IconData icon;
   final String sponsorId;
-  final ApplicationService applicationService;
+
+  final ApplicationService
+  applicationService;
 
   const _ScholarshipTile({
     required this.id,
@@ -132,78 +204,130 @@ class _ScholarshipTile extends StatefulWidget {
     required this.amount,
     required this.deadline,
     required this.icon,
-
     required this.sponsorId,
-
     required this.applicationService,
   });
 
   @override
-  State<_ScholarshipTile> createState() => _ScholarshipTileState();
+  State<_ScholarshipTile> createState() =>
+      _ScholarshipTileState();
 }
 
-class _ScholarshipTileState extends State<_ScholarshipTile> {
+class _ScholarshipTileState
+    extends State<_ScholarshipTile> {
+
   bool _isApplying = false;
 
   Future<void> _handleApply() async {
+
     setState(() => _isApplying = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser!;
-      final application = ApplicationModel(
+
+      final user =
+      FirebaseAuth.instance.currentUser!;
+
+      // Get student's profile data
+      // from Firestore
+      final userDoc =
+      await FirebaseFirestore.instance
+          .collection("users")
+          .doc(user.uid)
+          .get();
+
+      final studentCollege =
+          userDoc.data()?["college"] ?? "";
+
+      final application =
+      ApplicationModel(
         id: "",
         studentId: user.uid,
-        studentName: user.displayName ?? "Vinothini",
-        studentEmail: user.email ?? "",
 
-        sponsorId: widget.sponsorId,
+        studentName:
+        user.displayName ?? "Vinothini",
 
-        scholarshipId: widget.id,
-        scholarshipTitle: widget.title,
-        amount: widget.amount,
-        status: "Pending",
-        appliedAt: Timestamp.now(),
+        studentEmail:
+        user.email ?? "",
+
+        studentCollege:
+        studentCollege,
+
+        sponsorId:
+        widget.sponsorId,
+
+        scholarshipId:
+        widget.id,
+
+        scholarshipTitle:
+        widget.title,
+
+        amount:
+        widget.amount,
+
+        status:
+        "Pending",
+
+        appliedAt:
+        Timestamp.now(),
       );
 
       final result =
-      await widget.applicationService.applyScholarship(
+      await widget.applicationService
+          .applyScholarship(
         application,
       );
 
       if (!mounted) return;
 
       if (result == "Already Applied") {
-        ScaffoldMessenger.of(context).showSnackBar(
+
+        ScaffoldMessenger.of(context)
+            .showSnackBar(
           const SnackBar(
-            content: Text("⚠️ Already Applied"),
+            content:
+            Text("⚠️ Already Applied"),
           ),
         );
+
       } else if (result == "Success") {
-        ScaffoldMessenger.of(context).showSnackBar(
+
+        ScaffoldMessenger.of(context)
+            .showSnackBar(
           const SnackBar(
-            content: Text("🎉 Application Submitted Successfully"),
+            content: Text(
+              "🎉 Application Submitted Successfully",
+            ),
           ),
         );
+
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result)),
+
+        ScaffoldMessenger.of(context)
+            .showSnackBar(
+          SnackBar(
+            content: Text(result),
+          ),
         );
       }
+
     } finally {
+
       if (mounted) {
-        setState(() => _isApplying = false);
+        setState(() =>
+        _isApplying = false);
       }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(18),
+
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(20),
+
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -212,25 +336,41 @@ class _ScholarshipTileState extends State<_ScholarshipTile> {
           ),
         ],
       ),
+
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+
         children: [
+
           Row(
             children: [
+
               Container(
                 width: 48,
                 height: 48,
+
                 decoration: BoxDecoration(
-                  color: AppColors.secondary.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(14),
+                  color: AppColors.secondary
+                      .withOpacity(0.15),
+                  borderRadius:
+                  BorderRadius.circular(14),
                 ),
-                child: Icon(widget.icon, color: AppColors.primary, size: 24),
+
+                child: Icon(
+                  widget.icon,
+                  color: AppColors.primary,
+                  size: 24,
+                ),
               ),
+
               const SizedBox(width: 14),
+
               Expanded(
                 child: Text(
                   widget.title,
-                  style: AppTextStyles.subtitle.copyWith(
+
+                  style:
+                  AppTextStyles.subtitle.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -244,22 +384,43 @@ class _ScholarshipTileState extends State<_ScholarshipTile> {
 
           Row(
             children: [
-              Icon(Icons.currency_rupee_rounded, size: 15, color: AppColors.textSecondary),
+
+              Icon(
+                Icons.currency_rupee_rounded,
+                size: 15,
+                color: AppColors.textSecondary,
+              ),
+
               const SizedBox(width: 4),
+
               Text(
                 widget.amount,
-                style: AppTextStyles.subtitle.copyWith(
+
+                style:
+                AppTextStyles.subtitle.copyWith(
                   color: AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                 ),
               ),
+
               const SizedBox(width: 18),
-              Icon(Icons.calendar_today_rounded, size: 13, color: AppColors.textSecondary),
+
+              Icon(
+                Icons.calendar_today_rounded,
+                size: 13,
+                color: AppColors.textSecondary,
+              ),
+
               const SizedBox(width: 4),
+
               Text(
                 widget.deadline,
-                style: AppTextStyles.subtitle.copyWith(fontSize: 13),
+
+                style:
+                AppTextStyles.subtitle.copyWith(
+                  fontSize: 13,
+                ),
               ),
             ],
           ),
@@ -268,22 +429,44 @@ class _ScholarshipTileState extends State<_ScholarshipTile> {
 
           SizedBox(
             width: double.infinity,
+
             child: ElevatedButton(
-              onPressed: _isApplying ? null : _handleApply,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+              onPressed:
+              _isApplying
+                  ? null
+                  : _handleApply,
+
+              style:
+              ElevatedButton.styleFrom(
+                backgroundColor:
+                AppColors.primary,
+                foregroundColor:
+                Colors.white,
+
+                padding:
+                const EdgeInsets.symmetric(
+                  vertical: 14,
                 ),
+
+                shape:
+                RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(12),
+                ),
+
                 elevation: 0,
               ),
+
               child: _isApplying
                   ? const SizedBox(
                 height: 18,
                 width: 18,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+
+                child:
+                CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
               )
                   : const Text("Apply"),
             ),

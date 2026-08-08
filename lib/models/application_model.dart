@@ -5,8 +5,9 @@ class ApplicationModel {
   final String studentId;
   final String studentName;
   final String studentEmail;
+  final String studentCollege;
 
-  final String sponsorId; // NEW
+  final String sponsorId;
 
   final String scholarshipId;
   final String scholarshipTitle;
@@ -19,9 +20,8 @@ class ApplicationModel {
     required this.studentId,
     required this.studentName,
     required this.studentEmail,
-
-    required this.sponsorId, // NEW
-
+    required this.studentCollege,
+    required this.sponsorId,
     required this.scholarshipId,
     required this.scholarshipTitle,
     required this.amount,
@@ -34,8 +34,9 @@ class ApplicationModel {
       'studentId': studentId,
       'studentName': studentName,
       'studentEmail': studentEmail,
+      'studentCollege': studentCollege,
 
-      'sponsorId': sponsorId, // NEW
+      'sponsorId': sponsorId,
 
       'scholarshipId': scholarshipId,
       'scholarshipTitle': scholarshipTitle,
@@ -54,8 +55,9 @@ class ApplicationModel {
       studentId: map['studentId'] ?? '',
       studentName: map['studentName'] ?? '',
       studentEmail: map['studentEmail'] ?? '',
+      studentCollege: map['studentCollege'] ?? '',
 
-      sponsorId: map['sponsorId'] ?? '', // NEW
+      sponsorId: map['sponsorId'] ?? '',
 
       scholarshipId: map['scholarshipId'] ?? '',
       scholarshipTitle: map['scholarshipTitle'] ?? '',

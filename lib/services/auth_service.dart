@@ -10,15 +10,18 @@ class AuthService {
     required String email,
     required String mobile,
     required String college,
+    required String course,
     required String password,
     required String role,
   }) async {
+    // Create Firebase Authentication account
     UserCredential userCredential =
     await _auth.createUserWithEmailAndPassword(
       email: email,
       password: password,
     );
 
+    // Save user details in Firestore
     await _firestore
         .collection("users")
         .doc(userCredential.user!.uid)
@@ -27,7 +30,9 @@ class AuthService {
       "email": email,
       "mobile": mobile,
       "college": college,
+      "course": course,
       "role": role,
+      "createdAt": FieldValue.serverTimestamp(),
     });
 
     return userCredential;
