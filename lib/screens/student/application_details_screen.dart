@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_text_styles.dart';
+
 class ApplicationDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> data;
   final String applicationId;
@@ -16,61 +19,48 @@ class ApplicationDetailsScreen extends StatelessWidget {
     final String status = data["status"] ?? "Pending";
 
     Color statusColor;
-
     switch (status) {
       case "Approved":
-        statusColor = Colors.green;
+        statusColor = AppColors.success;
         break;
-
       case "Rejected":
-        statusColor = Colors.red;
+        statusColor = AppColors.error;
         break;
-
       default:
-        statusColor = Colors.orange;
+        statusColor = AppColors.warning;
     }
 
     String appliedDate = "Date not available";
-
-    if (data["appliedAt"] != null &&
-        data["appliedAt"] is Timestamp) {
+    if (data["appliedAt"] != null && data["appliedAt"] is Timestamp) {
       final timestamp = data["appliedAt"] as Timestamp;
       final date = timestamp.toDate();
-
       appliedDate =
-      "${date.day.toString().padLeft(2, '0')}/"
-          "${date.month.toString().padLeft(2, '0')}/"
-          "${date.year}";
+      "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           "Application Details",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+          style: AppTextStyles.title.copyWith(fontSize: 18, color: AppColors.textPrimary),
         ),
         centerTitle: true,
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: AppColors.background,
         elevation: 0,
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            // Scholarship Header
+            // Scholarship header
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.card,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -80,59 +70,40 @@ class ApplicationDetailsScreen extends StatelessWidget {
                   ),
                 ],
               ),
-
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-
                   Row(
                     children: [
-
                       Container(
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.10),
+                          color: AppColors.primary.withOpacity(0.10),
                           borderRadius: BorderRadius.circular(15),
                         ),
-
-                        child: const Icon(
-                          Icons.school_rounded,
-                          color: Colors.blue,
-                          size: 27,
-                        ),
+                        child: Icon(Icons.school_rounded, color: AppColors.primary, size: 27),
                       ),
-
                       const SizedBox(width: 14),
-
                       Expanded(
                         child: Text(
-                          data["scholarshipTitle"] ??
-                              "Scholarship",
-                          style: const TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          data["scholarshipTitle"] ?? "Scholarship",
+                          style: AppTextStyles.title.copyWith(fontSize: 19, color: AppColors.textPrimary),
                         ),
                       ),
                     ],
                   ),
 
                   const SizedBox(height: 20),
-
-                  const Divider(),
-
+                  Divider(color: AppColors.textSecondary.withOpacity(0.15)),
                   const SizedBox(height: 16),
 
                   _InfoRow(
                     icon: Icons.currency_rupee_rounded,
                     label: "Scholarship Amount",
-                    value: data["amount"] ??
-                        "Amount not available",
+                    value: data["amount"] ?? "Amount not available",
                   ),
-
                   const SizedBox(height: 14),
-
                   _InfoRow(
                     icon: Icons.calendar_today_rounded,
                     label: "Applied Date",
@@ -144,13 +115,9 @@ class ApplicationDetailsScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // Student Information
-            const Text(
+            Text(
               "Student Information",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: AppTextStyles.title.copyWith(fontSize: 18, color: AppColors.textPrimary),
             ),
 
             const SizedBox(height: 12),
@@ -159,7 +126,7 @@ class ApplicationDetailsScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.card,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -169,33 +136,24 @@ class ApplicationDetailsScreen extends StatelessWidget {
                   ),
                 ],
               ),
-
               child: Column(
                 children: [
-
                   _InfoRow(
                     icon: Icons.person_outline_rounded,
                     label: "Name",
-                    value: data["studentName"] ??
-                        "Name not available",
+                    value: data["studentName"] ?? "Name not available",
                   ),
-
                   const SizedBox(height: 16),
-
                   _InfoRow(
                     icon: Icons.email_outlined,
                     label: "Email",
-                    value: data["studentEmail"] ??
-                        "Email not available",
+                    value: data["studentEmail"] ?? "Email not available",
                   ),
-
                   const SizedBox(height: 16),
-
                   _InfoRow(
                     icon: Icons.account_balance_rounded,
                     label: "College",
-                    value: data["studentCollege"] ??
-                        "College not available",
+                    value: data["studentCollege"] ?? "College not available",
                   ),
                 ],
               ),
@@ -203,13 +161,9 @@ class ApplicationDetailsScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // Application Status
-            const Text(
+            Text(
               "Application Status",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: AppTextStyles.title.copyWith(fontSize: 18, color: AppColors.textPrimary),
             ),
 
             const SizedBox(height: 12),
@@ -220,14 +174,10 @@ class ApplicationDetailsScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 color: statusColor.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: statusColor.withOpacity(0.25),
-                ),
+                border: Border.all(color: statusColor.withOpacity(0.25)),
               ),
-
               child: Row(
                 children: [
-
                   Icon(
                     status == "Approved"
                         ? Icons.check_circle
@@ -237,36 +187,27 @@ class ApplicationDetailsScreen extends StatelessWidget {
                     color: statusColor,
                     size: 28,
                   ),
-
                   const SizedBox(width: 14),
-
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
                         Text(
                           status,
-                          style: TextStyle(
+                          style: AppTextStyles.subtitle.copyWith(
                             color: statusColor,
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-
                         const SizedBox(height: 4),
-
                         Text(
                           status == "Approved"
                               ? "Your application has been approved."
                               : status == "Rejected"
                               ? "Your application has been rejected."
                               : "Your application is under review.",
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey,
-                          ),
+                          style: AppTextStyles.subtitle.copyWith(fontSize: 13),
                         ),
                       ],
                     ),
@@ -282,43 +223,36 @@ class ApplicationDetailsScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.card,
                 borderRadius: BorderRadius.circular(15),
-              ),
-
-              child: Row(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
-                children: [
-
-                  const Icon(
-                    Icons.fingerprint_rounded,
-                    color: Colors.grey,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
                   ),
-
+                ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.fingerprint_rounded, color: AppColors.textSecondary),
                   const SizedBox(width: 10),
-
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
-                        const Text(
+                        Text(
                           "Application ID",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
+                          style: AppTextStyles.subtitle.copyWith(fontSize: 12),
                         ),
-
                         const SizedBox(height: 4),
-
                         Text(
                           applicationId,
-                          style: const TextStyle(
+                          style: AppTextStyles.subtitle.copyWith(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ],
@@ -352,36 +286,20 @@ class _InfoRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-
-        Icon(
-          icon,
-          size: 20,
-          color: Colors.grey,
-        ),
-
+        Icon(icon, size: 20, color: AppColors.textSecondary),
         const SizedBox(width: 12),
-
         Expanded(
           child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
-              ),
-
+              Text(label, style: AppTextStyles.subtitle.copyWith(fontSize: 12)),
               const SizedBox(height: 3),
-
               Text(
                 value,
-                style: const TextStyle(
+                style: AppTextStyles.subtitle.copyWith(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],

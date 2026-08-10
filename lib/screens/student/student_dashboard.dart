@@ -8,6 +8,7 @@ import 'application_screen.dart';
 import 'profile_screen.dart';
 import '../../models/scholarship_model.dart';
 import '../../services/scholarship_service.dart';
+import 'my_applications_screen.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -164,7 +165,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) =>  ApplicationScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const MyApplicationsScreen(),
+                            ),
                           );
                         },
                       ),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
+import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_text_styles.dart';
 import 'application_details_screen.dart';
 
 class MyApplicationsScreen extends StatelessWidget {
@@ -8,35 +11,33 @@ class MyApplicationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = FirebaseAuth.instance.currentUser;
+    final User? currentUser = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text("My Applications"),
+        title: Text(
+          "My Applications",
+          style: AppTextStyles.title.copyWith(fontSize: 18, color: AppColors.textPrimary),
+        ),
         centerTitle: true,
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
       body: currentUser == null
-          ? const Center(
-        child: Text("Please login again"),
+          ? Center(
+        child: Text("Please login again", style: AppTextStyles.subtitle),
       )
           : StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection("applications")
-            .where(
-          "studentId",
-          isEqualTo: currentUser.uid,
-        )
-            .orderBy(
-          "appliedAt",
-          descending: true,
-        )
+            .where("studentId", isEqualTo: currentUser.uid)
+            .orderBy("appliedAt", descending: true)
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState ==
-              ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator(color: AppColors.primary));
           }
 
           if (snapshot.hasError) {
@@ -46,20 +47,24 @@ class MyApplicationsScreen extends StatelessWidget {
                 child: Text(
                   "Error: ${snapshot.error}",
                   textAlign: TextAlign.center,
+                  style: AppTextStyles.subtitle.copyWith(color: AppColors.error),
                 ),
               ),
             );
           }
 
-          if (!snapshot.hasData ||
-              snapshot.data!.docs.isEmpty) {
-            return const Center(
-              child: Text(
-                "No Applications Yet",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                ),
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.assignment_outlined, size: 60, color: AppColors.textSecondary),
+                  const SizedBox(height: 14),
+                  Text(
+                    "No Applications Yet",
+                    style: AppTextStyles.title.copyWith(fontSize: 17, color: AppColors.textPrimary),
+                  ),
+                ],
               ),
             );
           }
@@ -70,64 +75,50 @@ class MyApplicationsScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             itemCount: docs.length,
             itemBuilder: (context, index) {
-              final data =
-              docs[index].data() as Map<String, dynamic>;
+              final doc = docs[index];
+              final data = doc.data() as Map<String, dynamic>;
+              final applicationId = doc.id;
 
-              final applicationId = docs[index].id;
-
-              return _buildCard(
-                context,
-                data,
-                applicationId,
-              );
+              return _buildCard(context, data, applicationId);
             },
           );
         },
       ),
     );
   }
+
   Widget _buildCard(
       BuildContext context,
       Map<String, dynamic> data,
       String applicationId,
       ) {
-    final String status = data["status"] ?? "Pending";
-
-
+    final String status = data["status"]?.toString() ?? "Pending";
 
     Color statusColor;
-
     switch (status) {
       case "Approved":
-        statusColor = Colors.green;
+        statusColor = AppColors.success;
         break;
-
       case "Rejected":
-        statusColor = Colors.red;
+        statusColor = AppColors.error;
         break;
-
       default:
-        statusColor = Colors.orange;
+        statusColor = AppColors.warning;
     }
 
     String appliedDate = "Date not available";
-
-    if (data["appliedAt"] != null &&
-        data["appliedAt"] is Timestamp) {
-      final timestamp = data["appliedAt"] as Timestamp;
-      final date = timestamp.toDate();
-
+    if (data["appliedAt"] is Timestamp) {
+      final Timestamp timestamp = data["appliedAt"] as Timestamp;
+      final DateTime date = timestamp.toDate();
       appliedDate =
-      "${date.day.toString().padLeft(2, '0')}/"
-          "${date.month.toString().padLeft(2, '0')}/"
-          "${date.year}";
+      "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 18),
+      margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -140,158 +131,74 @@ class MyApplicationsScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           // Scholarship title
           Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.10),
-                  borderRadius: BorderRadius.circular(14),
+                  color: AppColors.primary.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(13),
                 ),
-                child: const Icon(
-                  Icons.school_rounded,
-                  color: Colors.blue,
-                  size: 25,
-                ),
+                child: Icon(Icons.school_rounded, color: AppColors.primary, size: 24),
               ),
-
               const SizedBox(width: 14),
-
               Expanded(
                 child: Text(
-                  data["scholarshipTitle"] ?? "Scholarship",
-                  style: const TextStyle(
+                  data["scholarshipTitle"]?.toString() ?? "Scholarship",
+                  style: AppTextStyles.subtitle.copyWith(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
-          // Amount
-          Row(
-            children: [
-              const Icon(
-                Icons.currency_rupee_rounded,
-                size: 18,
-                color: Colors.grey,
-              ),
-
-              const SizedBox(width: 6),
-
-              Text(
-                data["amount"] ?? "Amount not available",
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+          _DetailRow(
+            icon: Icons.currency_rupee_rounded,
+            text: data["amount"]?.toString() ?? "Amount not available",
+            bold: true,
+          ),
+          const SizedBox(height: 10),
+          _DetailRow(
+            icon: Icons.account_balance_rounded,
+            text: data["studentCollege"]?.toString() ?? "College not available",
+          ),
+          const SizedBox(height: 10),
+          _DetailRow(
+            icon: Icons.email_outlined,
+            text: data["studentEmail"]?.toString() ?? "",
+          ),
+          const SizedBox(height: 10),
+          _DetailRow(
+            icon: Icons.calendar_today_rounded,
+            text: "Applied: $appliedDate",
+            muted: true,
           ),
 
-          const SizedBox(height: 12),
-
-          // College
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.account_balance_rounded,
-                size: 18,
-                color: Colors.grey,
-              ),
-
-              const SizedBox(width: 6),
-
-              Expanded(
-                child: Text(
-                  data["studentCollege"] ??
-                      "College not available",
-                  style: const TextStyle(
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Email
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.email_outlined,
-                size: 18,
-                color: Colors.grey,
-              ),
-
-              const SizedBox(width: 6),
-
-              Expanded(
-                child: Text(
-                  data["studentEmail"] ?? "",
-                  style: const TextStyle(
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Applied date
-          Row(
-            children: [
-              const Icon(
-                Icons.calendar_today_rounded,
-                size: 17,
-                color: Colors.grey,
-              ),
-
-              const SizedBox(width: 6),
-
-              Text(
-                "Applied: $appliedDate",
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 18),
-
-          const Divider(),
-
+          const SizedBox(height: 16),
+          Divider(color: AppColors.textSecondary.withOpacity(0.15)),
           const SizedBox(height: 12),
 
           // Status
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 "Application Status",
-                style: TextStyle(
+                style: AppTextStyles.subtitle.copyWith(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
                 ),
               ),
-
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(20),
@@ -308,12 +215,10 @@ class MyApplicationsScreen extends StatelessWidget {
                       size: 16,
                       color: statusColor,
                     ),
-
                     const SizedBox(width: 6),
-
                     Text(
                       status,
-                      style: TextStyle(
+                      style: AppTextStyles.subtitle.copyWith(
                         color: statusColor,
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
@@ -322,74 +227,12 @@ class MyApplicationsScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ApplicationDetailsScreen(
-                          data: data,
-                          applicationId: applicationId,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(
-                    Icons.visibility_outlined,
-                    size: 18,
-                  ),
-                  label: const Text("View Details"),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 8,
-            ),
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  status == "Approved"
-                      ? Icons.check_circle
-                      : status == "Rejected"
-                      ? Icons.cancel
-                      : Icons.access_time_rounded,
-                  size: 16,
-                  color: statusColor,
-                ),
 
-                const SizedBox(width: 6),
+          const SizedBox(height: 18),
 
-                Text(
-                  status,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
+          // View Details
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -404,12 +247,10 @@ class MyApplicationsScreen extends StatelessWidget {
                   ),
                 );
               },
-              icon: const Icon(
-                Icons.visibility_outlined,
-                size: 18,
-              ),
-              label: const Text("View Details"),
+              icon: Icon(Icons.visibility_outlined, color: AppColors.primary, size: 19),
+              label: Text("View Details", style: TextStyle(color: AppColors.primary)),
               style: OutlinedButton.styleFrom(
+                side: BorderSide(color: AppColors.primary, width: 1.4),
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -419,6 +260,41 @@ class MyApplicationsScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final bool bold;
+  final bool muted;
+
+  const _DetailRow({
+    required this.icon,
+    required this.text,
+    this.bold = false,
+    this.muted = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: muted ? 16 : 18, color: AppColors.textSecondary),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: AppTextStyles.subtitle.copyWith(
+              fontSize: muted ? 12 : 14,
+              fontWeight: bold ? FontWeight.w600 : FontWeight.normal,
+              color: muted ? AppColors.textSecondary : AppColors.textPrimary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
