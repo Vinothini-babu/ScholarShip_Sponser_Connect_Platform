@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import 'application_details_screen.dart';
 
 class ApplicationsScreen extends StatelessWidget {
   const ApplicationsScreen({super.key});
@@ -70,7 +71,7 @@ class ApplicationsScreen extends StatelessWidget {
                     documentId: doc.id,
                     studentName: data["studentName"] ?? "",
                     college: data["studentCollege"] ?? "",
-                    course: data["studentEmail"] ?? "",
+                    course: data["course"] ?? "",
                     scholarship: data["scholarshipTitle"] ?? "",
                     status: data["status"] ?? "Pending",
                   ),
@@ -185,6 +186,43 @@ class ApplicationsScreen extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ApplicationDetailsScreen(
+                      data: {
+                        "studentName": studentName,
+                        "studentCollege": college,
+                        "course": course,
+                        "scholarshipTitle": scholarship,
+                        "status": status,
+                      },
+                      applicationId: documentId,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(
+                Icons.visibility_outlined,
+                size: 18,
+              ),
+              label: const Text("View Details"),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
 
           Row(
             children: [

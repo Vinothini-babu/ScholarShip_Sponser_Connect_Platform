@@ -218,103 +218,94 @@ class _ScholarshipTileState
 
   bool _isApplying = false;
 
-  Future<void> _handleApply() async {
 
+  Future<void> _handleApply() async {
     setState(() => _isApplying = true);
 
     try {
+      final user = FirebaseAuth.instance.currentUser;
 
-      final user =
-      FirebaseAuth.instance.currentUser!;
+      if (user == null) {
+        throw Exception("User not logged in");
+      }
 
-      // Get student's profile data
-      // from Firestore
-      final userDoc =
-      await FirebaseFirestore.instance
+      // Get student's profile
+      final userDoc = await FirebaseFirestore.instance
           .collection("users")
           .doc(user.uid)
           .get();
 
-      final studentCollege =
-          userDoc.data()?["college"] ?? "";
+      final userData = userDoc.data() ?? {};
 
-      final application =
-      ApplicationModel(
+      final studentName =
+          userData["name"] ??
+              user.displayName ??
+              "Student";
+
+      final studentEmail =
+          userData["email"] ??
+              user.email ??
+              "";
+
+      final studentCollege =
+          userData["college"] ??
+              "";
+
+      final application = ApplicationModel(
         id: "",
         studentId: user.uid,
 
-        studentName:
-        user.displayName ?? "Vinothini",
+        studentName: studentName,
+        studentEmail: studentEmail,
+        studentCollege: studentCollege,
 
-        studentEmail:
-        user.email ?? "",
+        sponsorId: widget.sponsorId,
 
-        studentCollege:
-        studentCollege,
+        scholarshipId: widget.id,
+        scholarshipTitle: widget.title,
+        amount: widget.amount,
 
-        sponsorId:
-        widget.sponsorId,
-
-        scholarshipId:
-        widget.id,
-
-        scholarshipTitle:
-        widget.title,
-
-        amount:
-        widget.amount,
-
-        status:
-        "Pending",
-
-        appliedAt:
-        Timestamp.now(),
+        status: "Pending",
+        appliedAt: Timestamp.now(),
       );
 
-      final result =
-      await widget.applicationService
-          .applyScholarship(
-        application,
-      );
+      final result = await widget.applicationService
+          .applyScholarship(application);
 
       if (!mounted) return;
 
       if (result == "Already Applied") {
-
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content:
-            Text("⚠️ Already Applied"),
+            content: Text("⚠️ Already Applied"),
           ),
         );
-
       } else if (result == "Success") {
-
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
               "🎉 Application Submitted Successfully",
             ),
           ),
         );
-
       } else {
-
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result),
           ),
         );
       }
+    } catch (e) {
+      if (!mounted) return;
 
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Application failed: $e"),
+        ),
+      );
     } finally {
-
       if (mounted) {
-        setState(() =>
-        _isApplying = false);
+        setState(() => _isApplying = false);
       }
     }
   }

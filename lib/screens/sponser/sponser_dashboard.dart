@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
@@ -143,29 +145,74 @@ class SponsorDashboard extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  Text("Overview", style: AppTextStyles.title.copyWith(fontSize: 18)),
+                  Text(
+                    "Overview",
+                    style: AppTextStyles.title.copyWith(fontSize: 18),
+                  ),
 
                   const SizedBox(height: 16),
 
-                  _OverviewTile(
-                    icon: Icons.school_rounded,
-                    label: "Total Scholarships",
-                    value: "12",
-                    accent: AppColors.primary,
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection("scholarships")
+                        .where(
+                      "sponsorId",
+                      isEqualTo: FirebaseAuth.instance.currentUser!.uid,
+                    )
+                        .snapshots(),
+                    builder: (context, scholarshipSnapshot) {
+                      final totalScholarships =
+                          scholarshipSnapshot.data?.docs.length ?? 0;
+
+                      return _OverviewTile(
+                        icon: Icons.school_rounded,
+                        label: "Total Scholarships",
+                        value: "$totalScholarships",
+                        accent: AppColors.primary,
+                      );
+                    },
                   ),
+
                   const SizedBox(height: 12),
-                  _OverviewTile(
-                    icon: Icons.people_rounded,
-                    label: "Applications Received",
-                    value: "156",
-                    accent: AppColors.success,
-                  ),
-                  const SizedBox(height: 12),
-                  _OverviewTile(
-                    icon: Icons.check_circle_rounded,
-                    label: "Approved Students",
-                    value: "48",
-                    accent: AppColors.secondary,
+
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection("applications")
+                        .where(
+                      "sponsorId",
+                      isEqualTo: FirebaseAuth.instance.currentUser!.uid,
+                    )
+                        .snapshots(),
+                    builder: (context, applicationSnapshot) {
+                      final totalApplications =
+                          applicationSnapshot.data?.docs.length ?? 0;
+
+                      final approvedApplications =
+                          applicationSnapshot.data?.docs.where((doc) {
+                            final data = doc.data() as Map<String, dynamic>;
+                            return data["status"] == "Approved";
+                          }).length ?? 0;
+
+                      return Column(
+                        children: [
+                          _OverviewTile(
+                            icon: Icons.people_rounded,
+                            label: "Applications Received",
+                            value: "$totalApplications",
+                            accent: AppColors.success,
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          _OverviewTile(
+                            icon: Icons.check_circle_rounded,
+                            label: "Approved Students",
+                            value: "$approvedApplications",
+                            accent: AppColors.secondary,
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
