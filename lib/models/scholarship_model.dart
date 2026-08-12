@@ -9,6 +9,7 @@ class ScholarshipModel {
   final String eligibility;
   final String sponsorName;
   final String sponsorId;
+  final String scholarshipId;
 
   ScholarshipModel({
     required this.id,
@@ -19,6 +20,8 @@ class ScholarshipModel {
     required this.eligibility,
     required this.sponsorName,
     required this.sponsorId,
+    required this.scholarshipId,
+
   });
 
   factory ScholarshipModel.fromMap(
@@ -38,6 +41,7 @@ class ScholarshipModel {
       eligibility: map['eligibility'] ?? '',
       sponsorName: map['sponsorName'] ?? '',
       sponsorId: map['sponsorId'] ?? '',
+      scholarshipId: map['scholarshipId'] ?? '',
     );
   }
 }

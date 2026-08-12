@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
@@ -9,6 +11,8 @@ import 'profile_screen.dart';
 import '../../models/scholarship_model.dart';
 import '../../services/scholarship_service.dart';
 import 'my_applications_screen.dart';
+import '../../services/saved_scholarship_service.dart';
+import 'saved/saved_scholarships_screen.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -127,8 +131,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     itemBuilder: (context, index) {
 
                       final scholarship = scholarships[index];
-
                       return _ScholarshipCard(
+                        scholarshipId: scholarship.id,
                         title: scholarship.title,
                         amount: scholarship.amount,
                         deadline: scholarship.lastDate,
@@ -184,7 +188,14 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       _QuickAction(
                         icon: Icons.favorite,
                         title: "Saved",
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => SavedScholarshipsScreen(),
+                            ),
+                          );
+                        },
                       ),
                       _QuickAction(
                         icon: Icons.support_agent,
@@ -395,7 +406,6 @@ class _PromoBanner extends StatelessWidget {
     );
   }
 }
-
 // =======================================================
 // STATS GRID
 // =======================================================
@@ -405,97 +415,259 @@ class _StatsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stats = [
-      (
-      icon: Icons.school_rounded,
-      title: "Scholarships",
-      value: "120",
-      color: AppColors.primary,
-      ),
-      (
-      icon: Icons.assignment_turned_in_rounded,
-      title: "Applied",
-      value: "08",
-      color: AppColors.success,
-      ),
-      (
-      icon: Icons.favorite_rounded,
-      title: "Saved",
-      value: "15",
-      color: AppColors.error,
-      ),
-      (
-      icon: Icons.workspace_premium_rounded,
-      title: "Eligible",
-      value: "35",
-      color: AppColors.secondary,
-      ),
-    ];
+    final studentId = FirebaseAuth.instance.currentUser?.uid;
+
+    if (studentId == null) {
+      return const SizedBox.shrink();
+    }
+
+    final firestore = FirebaseFirestore.instance;
+    final savedService = SavedScholarshipService();
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth > 900;
 
-        return GridView.builder(
+        return GridView(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: stats.length,
+
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             crossAxisSpacing: 14,
             mainAxisSpacing: 14,
             childAspectRatio: isDesktop ? 4.2 : 2.0,
           ),
-          itemBuilder: (context, index) {
-            final stat = stats[index];
 
-            return _TapFeedback(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () {},
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: stat.color.withValues(alpha: .20),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: stat.color.withValues(alpha: .12),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircleAvatar(
-                      radius: 13,
-                      backgroundColor: stat.color.withValues(alpha: .15),
-                      child: Icon(stat.icon, color: stat.color, size: 14),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      stat.value,
-                      style: AppTextStyles.title.copyWith(
-                        fontSize: 15,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      stat.title,
-                      style: AppTextStyles.subtitle.copyWith(fontWeight: FontWeight.w600, fontSize: 10),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+          children: [
+
+            // =================================================
+            // SCHOLARSHIPS - REAL TIME
+            // =================================================
+
+            StreamBuilder<QuerySnapshot>(
+              stream: firestore
+                  .collection("scholarships")
+                  .where("status", isEqualTo: "Active")
+                  .snapshots(),
+
+              builder: (context, snapshot) {
+
+                final count =
+                    snapshot.data?.docs.length ?? 0;
+
+                return _buildStatCard(
+                  icon: Icons.school_rounded,
+                  title: "Scholarships",
+                  value: "$count",
+                  color: AppColors.primary,
+                );
+              },
+            ),
+
+            // =================================================
+            // APPLIED - REAL TIME
+            // =================================================
+
+            StreamBuilder<QuerySnapshot>(
+              stream: firestore
+                  .collection("applications")
+                  .where(
+                "studentId",
+                isEqualTo: studentId,
+              )
+                  .snapshots(),
+
+              builder: (context, snapshot) {
+
+                final count =
+                    snapshot.data?.docs.length ?? 0;
+
+                return _buildStatCard(
+                  icon: Icons.assignment_turned_in_rounded,
+                  title: "Applied",
+                  value: "$count",
+                  color: AppColors.success,
+                );
+              },
+            ),
+
+            // =================================================
+            // SAVED - REAL TIME
+            // =================================================
+
+            StreamBuilder<int>(
+              stream: savedService.getSavedCount(studentId),
+
+              builder: (context, snapshot) {
+
+                final count =
+                    snapshot.data ?? 0;
+
+                return _buildStatCard(
+                  icon: Icons.favorite_rounded,
+                  title: "Saved",
+                  value: "$count",
+                  color: AppColors.error,
+                );
+              },
+            ),
+
+            // =================================================
+            // ELIGIBLE - REAL TIME
+            // =================================================
+
+            StreamBuilder<QuerySnapshot>(
+              stream: firestore
+                  .collection("scholarships")
+                  .where("status", isEqualTo: "Active")
+                  .snapshots(),
+
+              builder: (context, scholarshipSnapshot) {
+
+                return StreamBuilder<DocumentSnapshot>(
+                  stream: firestore
+                      .collection("users")
+                      .doc(studentId)
+                      .snapshots(),
+
+                  builder: (context, userSnapshot) {
+
+                    int eligibleCount = 0;
+
+                    if (scholarshipSnapshot.hasData &&
+                        userSnapshot.hasData &&
+                        userSnapshot.data!.exists) {
+
+                      final userData =
+                      userSnapshot.data!.data()
+                      as Map<String, dynamic>?;
+
+                      final studentCollege =
+                      (userData?["college"] ?? "")
+                          .toString()
+                          .toLowerCase();
+
+                      final studentCourse =
+                      (userData?["course"] ?? "")
+                          .toString()
+                          .toLowerCase();
+
+                      for (final doc
+                      in scholarshipSnapshot.data!.docs) {
+
+                        final data =
+                        doc.data()
+                        as Map<String, dynamic>;
+
+                        final eligibility =
+                        (data["eligibility"] ?? "")
+                            .toString()
+                            .toLowerCase();
+
+                        // If eligibility is empty,
+                        // consider it available.
+                        if (eligibility.isEmpty) {
+                          eligibleCount++;
+                          continue;
+                        }
+
+                        // Basic eligibility matching
+                        if (eligibility.contains("all") ||
+                            eligibility.contains(studentCollege) ||
+                            eligibility.contains(studentCourse)) {
+                          eligibleCount++;
+                        }
+                      }
+                    }
+
+                    return _buildStatCard(
+                      icon: Icons.workspace_premium_rounded,
+                      title: "Eligible",
+                      value: "$eligibleCount",
+                      color: AppColors.secondary,
+                    );
+                  },
+                );
+              },
+            ),
+          ],
         );
       },
+    );
+  }
+
+  Widget _buildStatCard({
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color color,
+  }) {
+    return _TapFeedback(
+      borderRadius: BorderRadius.circular(16),
+
+      onTap: () {},
+
+      child: Container(
+        padding: const EdgeInsets.all(10),
+
+        decoration: BoxDecoration(
+          color: Colors.white,
+
+          borderRadius: BorderRadius.circular(16),
+
+          border: Border.all(
+            color: color.withValues(alpha: .20),
+            width: 1.2,
+          ),
+
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: .12),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+
+          children: [
+
+            CircleAvatar(
+              radius: 13,
+
+              backgroundColor:
+              color.withValues(alpha: .15),
+
+              child: Icon(
+                icon,
+                color: color,
+                size: 14,
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            Text(
+              value,
+              style: AppTextStyles.title.copyWith(
+                fontSize: 15,
+                color: AppColors.textPrimary,
+              ),
+            ),
+
+            Text(
+              title,
+              style: AppTextStyles.subtitle.copyWith(
+                fontWeight: FontWeight.w600,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -542,6 +714,7 @@ class _SectionHeader extends StatelessWidget {
 // =======================================================
 
 class _ScholarshipCard extends StatelessWidget {
+  final String scholarshipId;
   final String title;
   final String amount;
   final String deadline;
@@ -550,6 +723,7 @@ class _ScholarshipCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _ScholarshipCard({
+    required this.scholarshipId,
     required this.title,
     required this.amount,
     required this.deadline,
@@ -585,20 +759,87 @@ class _ScholarshipCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                height: 58,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [accent, accent.withValues(alpha: .75)],
+              Stack(
+                children: [
+                  Container(
+                    height: 58,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          accent,
+                          accent.withValues(alpha: .75),
+                        ],
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        icon,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
                   ),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
+
+                  // ❤️ Save Button
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: StreamBuilder<bool>(
+                      stream: SavedScholarshipService().isSaved(
+                        studentId:
+                        FirebaseAuth.instance.currentUser!.uid,
+                        scholarshipId: scholarshipId,
+                      ),
+                      builder: (context, snapshot) {
+                        final isSaved = snapshot.data ?? false;
+
+                        return Material(
+                          color: Colors.white.withValues(alpha: .90),
+                          shape: const CircleBorder(),
+                          child: IconButton(
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () async {
+                              final service =
+                              SavedScholarshipService();
+
+                              final studentId =
+                                  FirebaseAuth.instance.currentUser!.uid;
+
+                              if (isSaved) {
+                                await service.removeSavedScholarship(
+                                  studentId: studentId,
+                                  scholarshipId: scholarshipId,
+                                );
+                              } else {
+                                await service.saveScholarship(
+                                  studentId: studentId,
+                                  scholarshipId: scholarshipId,
+                                  title: title,
+                                  amount: amount,
+                                  lastDate: deadline,
+                                );
+                              }
+                            },
+                            icon: Icon(
+                              isSaved
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
+                              color: isSaved
+                                  ? AppColors.error
+                                  : AppColors.textSecondary,
+                              size: 20,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
-                child: Center(
-                  child: Icon(icon, color: Colors.white, size: 28),
-                ),
+                ],
               ),
               Padding(
                 padding: const EdgeInsets.all(13),
