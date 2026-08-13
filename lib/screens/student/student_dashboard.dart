@@ -406,10 +406,6 @@ class _PromoBanner extends StatelessWidget {
     );
   }
 }
-// =======================================================
-// STATS GRID
-// =======================================================
-
 class _StatsGrid extends StatelessWidget {
   const _StatsGrid();
 
@@ -431,18 +427,16 @@ class _StatsGrid extends StatelessWidget {
         return GridView(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             crossAxisSpacing: 14,
             mainAxisSpacing: 14,
             childAspectRatio: isDesktop ? 4.2 : 2.0,
           ),
-
           children: [
 
             // =================================================
-            // SCHOLARSHIPS - REAL TIME
+            // 1. SCHOLARSHIPS - REAL TIME
             // =================================================
 
             StreamBuilder<QuerySnapshot>(
@@ -452,7 +446,6 @@ class _StatsGrid extends StatelessWidget {
                   .snapshots(),
 
               builder: (context, snapshot) {
-
                 final count =
                     snapshot.data?.docs.length ?? 0;
 
@@ -466,7 +459,7 @@ class _StatsGrid extends StatelessWidget {
             ),
 
             // =================================================
-            // APPLIED - REAL TIME
+            // 2. APPLIED - REAL TIME
             // =================================================
 
             StreamBuilder<QuerySnapshot>(
@@ -479,7 +472,6 @@ class _StatsGrid extends StatelessWidget {
                   .snapshots(),
 
               builder: (context, snapshot) {
-
                 final count =
                     snapshot.data?.docs.length ?? 0;
 
@@ -493,14 +485,13 @@ class _StatsGrid extends StatelessWidget {
             ),
 
             // =================================================
-            // SAVED - REAL TIME
+            // 3. SAVED - REAL TIME
             // =================================================
 
             StreamBuilder<int>(
               stream: savedService.getSavedCount(studentId),
 
               builder: (context, snapshot) {
-
                 final count =
                     snapshot.data ?? 0;
 
@@ -514,21 +505,35 @@ class _StatsGrid extends StatelessWidget {
             ),
 
             // =================================================
-            // ELIGIBLE - REAL TIME
+            // 4. ELIGIBLE - REAL TIME
             // =================================================
 
             StreamBuilder<QuerySnapshot>(
               stream: firestore
                   .collection("scholarships")
-                  .where("status", isEqualTo: "Active")
+                  .where(
+                "status",
+                isEqualTo: "Active",
+              )
                   .snapshots(),
 
               builder: (context, scholarshipSnapshot) {
 
+                // ---------------------------------------------
+                // STUDENT PROFILE
+                // Firebase:
+                // users
+                //   └── student
+                //       └── studentId
+                //           └── profile
+                // ---------------------------------------------
+
                 return StreamBuilder<DocumentSnapshot>(
                   stream: firestore
                       .collection("users")
-                      .doc(studentId)
+                      .doc("student")
+                      .collection(studentId)
+                      .doc("profile")
                       .snapshots(),
 
                   builder: (context, userSnapshot) {
@@ -543,15 +548,35 @@ class _StatsGrid extends StatelessWidget {
                       userSnapshot.data!.data()
                       as Map<String, dynamic>?;
 
-                      final studentCollege =
-                      (userData?["college"] ?? "")
-                          .toString()
-                          .toLowerCase();
+                      // =========================================
+                      // STUDENT DETAILS
+                      // =========================================
 
                       final studentCourse =
                       (userData?["course"] ?? "")
                           .toString()
+                          .trim()
                           .toLowerCase();
+
+                      final studentCategory =
+                      (userData?["category"] ?? "")
+                          .toString()
+                          .trim()
+                          .toLowerCase();
+
+                      final studentPercentage =
+                      _toDouble(
+                        userData?["percentage"],
+                      );
+
+                      final studentIncome =
+                      _toDouble(
+                        userData?["annualIncome"],
+                      );
+
+                      // =========================================
+                      // CHECK EVERY SCHOLARSHIP
+                      // =========================================
 
                       for (final doc
                       in scholarshipSnapshot.data!.docs) {
@@ -560,22 +585,75 @@ class _StatsGrid extends StatelessWidget {
                         doc.data()
                         as Map<String, dynamic>;
 
-                        final eligibility =
-                        (data["eligibility"] ?? "")
+                        // -----------------------------------------
+                        // SCHOLARSHIP REQUIREMENTS
+                        // -----------------------------------------
+
+                        final requiredCourse =
+                        (data["eligibleCourse"] ?? "")
                             .toString()
+                            .trim()
                             .toLowerCase();
 
-                        // If eligibility is empty,
-                        // consider it available.
-                        if (eligibility.isEmpty) {
-                          eligibleCount++;
-                          continue;
-                        }
+                        final requiredCategory =
+                        (data["eligibleCategory"] ?? "")
+                            .toString()
+                            .trim()
+                            .toLowerCase();
 
-                        // Basic eligibility matching
-                        if (eligibility.contains("all") ||
-                            eligibility.contains(studentCollege) ||
-                            eligibility.contains(studentCourse)) {
+                        final minimumPercentage =
+                        _toDouble(
+                          data["minimumPercentage"],
+                        );
+
+                        final maximumIncome =
+                        _toDouble(
+                          data["maximumAnnualIncome"],
+                        );
+
+                        // =========================================
+                        // COURSE CHECK
+                        // =========================================
+
+                        final courseEligible =
+                            requiredCourse.isEmpty ||
+                                requiredCourse == "all" ||
+                                studentCourse == requiredCourse;
+
+                        // =========================================
+                        // CATEGORY CHECK
+                        // =========================================
+
+                        final categoryEligible =
+                            requiredCategory.isEmpty ||
+                                requiredCategory == "all" ||
+                                studentCategory == requiredCategory;
+
+                        // =========================================
+                        // PERCENTAGE CHECK
+                        // =========================================
+
+                        final percentageEligible =
+                            studentPercentage >=
+                                minimumPercentage;
+
+                        // =========================================
+                        // INCOME CHECK
+                        // =========================================
+
+                        final incomeEligible =
+                            studentIncome <=
+                                maximumIncome;
+
+                        // =========================================
+                        // FINAL CHECK
+                        // =========================================
+
+                        if (courseEligible &&
+                            categoryEligible &&
+                            percentageEligible &&
+                            incomeEligible) {
+
                           eligibleCount++;
                         }
                       }
@@ -597,6 +675,29 @@ class _StatsGrid extends StatelessWidget {
     );
   }
 
+  // =======================================================
+  // CONVERT FIREBASE VALUE TO DOUBLE
+  // =======================================================
+
+  static double _toDouble(dynamic value) {
+    if (value == null) {
+      return 0;
+    }
+
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    return double.tryParse(
+      value.toString().trim(),
+    ) ??
+        0;
+  }
+
+  // =======================================================
+  // STAT CARD
+  // =======================================================
+
   Widget _buildStatCard({
     required IconData icon,
     required String title,
@@ -605,7 +706,6 @@ class _StatsGrid extends StatelessWidget {
   }) {
     return _TapFeedback(
       borderRadius: BorderRadius.circular(16),
-
       onTap: () {},
 
       child: Container(
@@ -613,7 +713,6 @@ class _StatsGrid extends StatelessWidget {
 
         decoration: BoxDecoration(
           color: Colors.white,
-
           borderRadius: BorderRadius.circular(16),
 
           border: Border.all(
@@ -637,7 +736,6 @@ class _StatsGrid extends StatelessWidget {
 
             CircleAvatar(
               radius: 13,
-
               backgroundColor:
               color.withValues(alpha: .15),
 

@@ -23,6 +23,12 @@ class _AddScholarshipScreenState
   final amountController = TextEditingController();
   final eligibilityController = TextEditingController();
   final documentController = TextEditingController();
+  final minPercentageController = TextEditingController();
+  final maxIncomeController = TextEditingController();
+  final eligibleCourseController = TextEditingController();
+  final eligibleCategoryController = TextEditingController();
+  final minimumPercentageController = TextEditingController();
+  final maximumIncomeController = TextEditingController();
 
   String? category;
   DateTime? lastDate;
@@ -161,6 +167,8 @@ class _AddScholarshipScreenState
                   labelText: "Eligibility",
                   prefixIcon: Icon(Icons.verified_user),
                 ),
+
+
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return "Enter Eligibility";
@@ -168,6 +176,107 @@ class _AddScholarshipScreenState
                   return null;
                 },
               ),
+
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: eligibleCourseController,
+                decoration: const InputDecoration(
+                  labelText: "Eligible Course",
+                  hintText: "e.g. B.Sc Computer Science",
+                  prefixIcon: Icon(Icons.menu_book_rounded),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: eligibleCategoryController,
+                decoration: const InputDecoration(
+                  labelText: "Eligible Category",
+                  hintText: "e.g. BC / MBC / SC / ST / OC",
+                  prefixIcon: Icon(Icons.category_rounded),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: minimumPercentageController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: "Minimum Percentage",
+                  hintText: "e.g. 60",
+                  prefixIcon: Icon(Icons.percent_rounded),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: maximumIncomeController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: "Maximum Annual Income",
+                  hintText: "e.g. 250000",
+                  prefixIcon: Icon(Icons.currency_rupee_rounded),
+                ),
+              ),
+
+
+
+              const SizedBox(height: 18),
+
+              TextFormField(
+                controller: minPercentageController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: "Minimum Percentage",
+                  prefixIcon: Icon(Icons.percent),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return "Enter Minimum Percentage";
+                  }
+
+                  final percentage = double.tryParse(value);
+
+                  if (percentage == null ||
+                      percentage < 0 ||
+                      percentage > 100) {
+                    return "Enter percentage between 0 and 100";
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 18),
+
+              TextFormField(
+                controller: maxIncomeController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: "Maximum Annual Income",
+                  prefixIcon: Icon(Icons.currency_rupee),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return "Enter Maximum Annual Income";
+                  }
+
+                  final income = double.tryParse(value);
+
+                  if (income == null || income < 0) {
+                    return "Enter a valid income";
+                  }
+
+                  return null;
+                },
+              ),
+
 
               const SizedBox(height: 18),
 
@@ -265,9 +374,30 @@ class _AddScholarshipScreenState
                       "description": descriptionController.text.trim(),
                       "amount": amountController.text.trim(),
                       "category": category,
+
                       "eligibility": eligibilityController.text.trim(),
-                      "requiredDocuments": documentController.text.trim(),
-                      "lastDate": Timestamp.fromDate(lastDate!),
+
+                      // 👇 New eligibility details
+                      "eligibleCourse": eligibleCourseController.text.trim(),
+
+                      "eligibleCategory":
+                      eligibleCategoryController.text.trim(),
+
+                      "minimumPercentage":
+                      double.tryParse(
+                        minimumPercentageController.text.trim(),
+                      ) ?? 0,
+
+                      "maximumAnnualIncome":
+                      double.tryParse(
+                        maximumIncomeController.text.trim(),
+                      ) ?? 0,
+
+                      "requiredDocuments":
+                      documentController.text.trim(),
+
+                      "lastDate":
+                      Timestamp.fromDate(lastDate!),
 
                       "sponsorId": user.uid,
                       "sponsorName": user.email,
@@ -317,6 +447,12 @@ class _AddScholarshipScreenState
     amountController.dispose();
     eligibilityController.dispose();
     documentController.dispose();
+
+    eligibleCourseController.dispose();
+    eligibleCategoryController.dispose();
+    minimumPercentageController.dispose();
+    maximumIncomeController.dispose();
+
     super.dispose();
   }
 }
