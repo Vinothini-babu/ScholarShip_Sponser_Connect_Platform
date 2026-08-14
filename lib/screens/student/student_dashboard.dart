@@ -13,6 +13,7 @@ import '../../services/scholarship_service.dart';
 import 'my_applications_screen.dart';
 import '../../services/saved_scholarship_service.dart';
 import 'saved/saved_scholarships_screen.dart';
+import 'eligible_scholarships_screen.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -24,8 +25,7 @@ class StudentDashboard extends StatefulWidget {
 class _StudentDashboardState extends State<StudentDashboard> {
   int _navIndex = 0;
 
-  final ScholarshipService scholarshipService =
-  ScholarshipService();
+  final ScholarshipService scholarshipService = ScholarshipService();
 
   void _handleNavTap(int index) {
     if (index == _navIndex) return;
@@ -100,51 +100,43 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
               const SizedBox(height: 18),
 
-            SizedBox(
-              height: 220,
-              child: StreamBuilder<List<ScholarshipModel>>(
-                stream: scholarshipService.getScholarships(),
-                builder: (context, snapshot) {
+              SizedBox(
+                height: 240,
+                child: StreamBuilder<List<ScholarshipModel>>(
+                  stream: scholarshipService.getScholarships(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator(color: AppColors.primary));
+                    }
 
-                  if (snapshot.connectionState ==
-                      ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(
-                      child: Text("No Scholarships Available"),
-                    );
-                  }
-
-                  print("Documents Count: ${snapshot.data?.length}");
-
-                  final scholarships = snapshot.data!;
-
-                  return ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: scholarships.length,
-
-                    itemBuilder: (context, index) {
-
-                      final scholarship = scholarships[index];
-                      return _ScholarshipCard(
-                        scholarshipId: scholarship.id,
-                        title: scholarship.title,
-                        amount: scholarship.amount,
-                        deadline: scholarship.lastDate,
-                        icon: Icons.school,
-                        accent: AppColors.primary,
-                        onTap: () {},
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return Center(
+                        child: Text("No Scholarships Available", style: AppTextStyles.subtitle),
                       );
-                    },
-                  );
-                },
+                    }
+
+                    final scholarships = snapshot.data!;
+
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: scholarships.length,
+                      itemBuilder: (context, index) {
+                        final scholarship = scholarships[index];
+                        return _ScholarshipCard(
+                          scholarshipId: scholarship.id,
+                          title: scholarship.title,
+                          amount: scholarship.amount,
+                          deadline: scholarship.lastDate,
+                          icon: Icons.school,
+                          accent: AppColors.primary,
+                          onTap: () {},
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
 
               const SizedBox(height: 30),
 
@@ -169,9 +161,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const MyApplicationsScreen(),
-                            ),
+                            MaterialPageRoute(builder: (_) => const MyApplicationsScreen()),
                           );
                         },
                       ),
@@ -191,9 +181,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                         onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => SavedScholarshipsScreen(),
-                            ),
+                            MaterialPageRoute(builder: (_) => SavedScholarshipsScreen()),
                           );
                         },
                       ),
@@ -212,9 +200,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                         crossAxisCount: crossAxisCount,
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
-                        // Fixed height regardless of width — stops the
-                        // huge vertical gap that appeared on wide (desktop) windows.
-                        mainAxisExtent: 60,
+                        mainAxisExtent: 68,
                       ),
                       itemBuilder: (context, index) => actions[index],
                     );
@@ -370,7 +356,7 @@ class _PromoBanner extends StatelessWidget {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
         child: Row(
           children: [
             CircleAvatar(
@@ -406,6 +392,11 @@ class _PromoBanner extends StatelessWidget {
     );
   }
 }
+
+// =======================================================
+// STATS GRID
+// =======================================================
+
 class _StatsGrid extends StatelessWidget {
   const _StatsGrid();
 
@@ -418,42 +409,52 @@ class _StatsGrid extends StatelessWidget {
     }
 
     final firestore = FirebaseFirestore.instance;
+
+    final scholarshipStream = firestore
+        .collection("scholarships")
+        .where("status", isEqualTo: "Active")
+        .snapshots();
+
+    final userStream = firestore.collection("users").doc(studentId).snapshots();
     final savedService = SavedScholarshipService();
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth > 900;
-
         return GridView(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            // Always 2 columns — 2 cards on top, 2 below — regardless
+            // of window width (Windows desktop or Android phone).
             crossAxisCount: 2,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: isDesktop ? 4.2 : 2.0,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            // Fixed height, with enough room to avoid the bottom
+            // overflow that appeared at 96px.
+            mainAxisExtent: 132,
           ),
           children: [
-
             // =================================================
             // 1. SCHOLARSHIPS - REAL TIME
             // =================================================
-
-            StreamBuilder<QuerySnapshot>(
-              stream: firestore
-                  .collection("scholarships")
-                  .where("status", isEqualTo: "Active")
-                  .snapshots(),
-
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: firestore.collection("scholarships").where("status", isEqualTo: "Active").snapshots(),
               builder: (context, snapshot) {
-                final count =
-                    snapshot.data?.docs.length ?? 0;
-
+                final count = snapshot.data?.docs.length ?? 0;
                 return _buildStatCard(
                   icon: Icons.school_rounded,
                   title: "Scholarships",
                   value: "$count",
                   color: AppColors.primary,
+
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const SearchScreen(),
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -461,25 +462,24 @@ class _StatsGrid extends StatelessWidget {
             // =================================================
             // 2. APPLIED - REAL TIME
             // =================================================
-
-            StreamBuilder<QuerySnapshot>(
-              stream: firestore
-                  .collection("applications")
-                  .where(
-                "studentId",
-                isEqualTo: studentId,
-              )
-                  .snapshots(),
-
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: firestore.collection("scholarships").where("status", isEqualTo: "Active").snapshots(),
               builder: (context, snapshot) {
-                final count =
-                    snapshot.data?.docs.length ?? 0;
-
+                final count = snapshot.data?.docs.length ?? 0;
                 return _buildStatCard(
                   icon: Icons.assignment_turned_in_rounded,
                   title: "Applied",
                   value: "$count",
                   color: AppColors.success,
+
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const MyApplicationsScreen(),
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -487,14 +487,10 @@ class _StatsGrid extends StatelessWidget {
             // =================================================
             // 3. SAVED - REAL TIME
             // =================================================
-
             StreamBuilder<int>(
               stream: savedService.getSavedCount(studentId),
-
               builder: (context, snapshot) {
-                final count =
-                    snapshot.data ?? 0;
-
+                final count = snapshot.data ?? 0;
                 return _buildStatCard(
                   icon: Icons.favorite_rounded,
                   title: "Saved",
@@ -507,153 +503,47 @@ class _StatsGrid extends StatelessWidget {
             // =================================================
             // 4. ELIGIBLE - REAL TIME
             // =================================================
-
-            StreamBuilder<QuerySnapshot>(
-              stream: firestore
-                  .collection("scholarships")
-                  .where(
-                "status",
-                isEqualTo: "Active",
-              )
-                  .snapshots(),
-
+            StreamBuilder(
+              stream: scholarshipStream,
               builder: (context, scholarshipSnapshot) {
+                if (!scholarshipSnapshot.hasData) {
+                  return _buildStatCard(
+                    icon: Icons.workspace_premium_rounded,
+                    title: "Eligible",
+                    value: "0",
+                    color: AppColors.secondary,
+                  );
+                }
 
-                // ---------------------------------------------
-                // STUDENT PROFILE
-                // Firebase:
-                // users
-                //   └── student
-                //       └── studentId
-                //           └── profile
-                // ---------------------------------------------
+                final scholarshipDocs = scholarshipSnapshot.data!.docs;
 
-                return StreamBuilder<DocumentSnapshot>(
-                  stream: firestore
-                      .collection("users")
-                      .doc("student")
-                      .collection(studentId)
-                      .doc("profile")
-                      .snapshots(),
-
+                return StreamBuilder(
+                  stream: userStream,
                   builder: (context, userSnapshot) {
-
                     int eligibleCount = 0;
 
-                    if (scholarshipSnapshot.hasData &&
-                        userSnapshot.hasData &&
-                        userSnapshot.data!.exists) {
+                    if (userSnapshot.hasData) {
+                      final userData = userSnapshot.data!.data();
 
-                      final userData =
-                      userSnapshot.data!.data()
-                      as Map<String, dynamic>?;
+                      final studentCourse = (userData?["course"] ?? "").toString().trim().toLowerCase();
+                      final studentCategory = (userData?["category"] ?? "").toString().trim().toLowerCase();
+                      final studentPercentage = _toDouble(userData?["percentage"]);
+                      final studentIncome = _toDouble(userData?["annualIncome"]);
 
-                      // =========================================
-                      // STUDENT DETAILS
-                      // =========================================
+                      for (final doc in scholarshipDocs) {
+                        final data = doc.data();
 
-                      final studentCourse =
-                      (userData?["course"] ?? "")
-                          .toString()
-                          .trim()
-                          .toLowerCase();
+                        final requiredCourse = (data["eligibleCourse"] ?? "").toString().trim().toLowerCase();
+                        final requiredCategory = (data["eligibleCategory"] ?? "").toString().trim().toLowerCase();
+                        final minPercentage = _toDouble(data["minimumPercentage"]);
+                        final maxIncome = _toDouble(data["maximumAnnualIncome"]);
 
-                      final studentCategory =
-                      (userData?["category"] ?? "")
-                          .toString()
-                          .trim()
-                          .toLowerCase();
+                        final courseOK = requiredCourse.isEmpty || requiredCourse == "all" || requiredCourse == studentCourse;
+                        final categoryOK = requiredCategory.isEmpty || requiredCategory == "all" || requiredCategory == studentCategory;
+                        final percentageOK = studentPercentage >= minPercentage;
+                        final incomeOK = studentIncome <= maxIncome;
 
-                      final studentPercentage =
-                      _toDouble(
-                        userData?["percentage"],
-                      );
-
-                      final studentIncome =
-                      _toDouble(
-                        userData?["annualIncome"],
-                      );
-
-                      // =========================================
-                      // CHECK EVERY SCHOLARSHIP
-                      // =========================================
-
-                      for (final doc
-                      in scholarshipSnapshot.data!.docs) {
-
-                        final data =
-                        doc.data()
-                        as Map<String, dynamic>;
-
-                        // -----------------------------------------
-                        // SCHOLARSHIP REQUIREMENTS
-                        // -----------------------------------------
-
-                        final requiredCourse =
-                        (data["eligibleCourse"] ?? "")
-                            .toString()
-                            .trim()
-                            .toLowerCase();
-
-                        final requiredCategory =
-                        (data["eligibleCategory"] ?? "")
-                            .toString()
-                            .trim()
-                            .toLowerCase();
-
-                        final minimumPercentage =
-                        _toDouble(
-                          data["minimumPercentage"],
-                        );
-
-                        final maximumIncome =
-                        _toDouble(
-                          data["maximumAnnualIncome"],
-                        );
-
-                        // =========================================
-                        // COURSE CHECK
-                        // =========================================
-
-                        final courseEligible =
-                            requiredCourse.isEmpty ||
-                                requiredCourse == "all" ||
-                                studentCourse == requiredCourse;
-
-                        // =========================================
-                        // CATEGORY CHECK
-                        // =========================================
-
-                        final categoryEligible =
-                            requiredCategory.isEmpty ||
-                                requiredCategory == "all" ||
-                                studentCategory == requiredCategory;
-
-                        // =========================================
-                        // PERCENTAGE CHECK
-                        // =========================================
-
-                        final percentageEligible =
-                            studentPercentage >=
-                                minimumPercentage;
-
-                        // =========================================
-                        // INCOME CHECK
-                        // =========================================
-
-                        final incomeEligible =
-                            studentIncome <=
-                                maximumIncome;
-
-                        // =========================================
-                        // FINAL CHECK
-                        // =========================================
-
-                        if (courseEligible &&
-                            categoryEligible &&
-                            percentageEligible &&
-                            incomeEligible) {
-
+                        if (courseOK && categoryOK && percentageOK && incomeOK) {
                           eligibleCount++;
                         }
                       }
@@ -680,18 +570,9 @@ class _StatsGrid extends StatelessWidget {
   // =======================================================
 
   static double _toDouble(dynamic value) {
-    if (value == null) {
-      return 0;
-    }
-
-    if (value is num) {
-      return value.toDouble();
-    }
-
-    return double.tryParse(
-      value.toString().trim(),
-    ) ??
-        0;
+    if (value == null) return 0;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString().trim()) ?? 0;
   }
 
   // =======================================================
@@ -703,65 +584,50 @@ class _StatsGrid extends StatelessWidget {
     required String title,
     required String value,
     required Color color,
+    VoidCallback? onTap,
+
   }) {
     return _TapFeedback(
       borderRadius: BorderRadius.circular(16),
-      onTap: () {},
-
+      onTap: onTap ?? () {},
       child: Container(
-        padding: const EdgeInsets.all(10),
-
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: color.withValues(alpha: .20),
-            width: 1.2,
+            color: color.withValues(alpha: .22),
+            width: 1.3,
           ),
-
           boxShadow: [
             BoxShadow(
-              color: color.withValues(alpha: .12),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: color.withValues(alpha: .14),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
-
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-
           children: [
-
-            CircleAvatar(
-              radius: 13,
-              backgroundColor:
-              color.withValues(alpha: .15),
-
-              child: Icon(
-                icon,
-                color: color,
-                size: 14,
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: .15),
+                shape: BoxShape.circle,
               ),
+              child: Icon(icon, color: color, size: 21),
             ),
-
-            const SizedBox(height: 6),
-
+            const SizedBox(height: 10),
             Text(
               value,
-              style: AppTextStyles.title.copyWith(
-                fontSize: 15,
-                color: AppColors.textPrimary,
-              ),
+              style: AppTextStyles.title.copyWith(fontSize: 22, color: AppColors.textPrimary),
             ),
-
             Text(
               title,
-              style: AppTextStyles.subtitle.copyWith(
-                fontWeight: FontWeight.w600,
-                fontSize: 10,
-              ),
+              style: AppTextStyles.subtitle.copyWith(fontWeight: FontWeight.w600, fontSize: 13),
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -838,7 +704,7 @@ class _ScholarshipCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         onTap: onTap,
         child: Container(
-          width: 168,
+          width: 188,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
@@ -860,14 +726,11 @@ class _ScholarshipCard extends StatelessWidget {
               Stack(
                 children: [
                   Container(
-                    height: 58,
+                    height: 66,
                     width: double.infinity,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [
-                          accent,
-                          accent.withValues(alpha: .75),
-                        ],
+                        colors: [accent, accent.withValues(alpha: .75)],
                       ),
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(20),
@@ -875,11 +738,7 @@ class _ScholarshipCard extends StatelessWidget {
                       ),
                     ),
                     child: Center(
-                      child: Icon(
-                        icon,
-                        color: Colors.white,
-                        size: 28,
-                      ),
+                      child: Icon(icon, color: Colors.white, size: 28),
                     ),
                   ),
 
@@ -889,8 +748,7 @@ class _ScholarshipCard extends StatelessWidget {
                     right: 8,
                     child: StreamBuilder<bool>(
                       stream: SavedScholarshipService().isSaved(
-                        studentId:
-                        FirebaseAuth.instance.currentUser!.uid,
+                        studentId: FirebaseAuth.instance.currentUser!.uid,
                         scholarshipId: scholarshipId,
                       ),
                       builder: (context, snapshot) {
@@ -902,11 +760,8 @@ class _ScholarshipCard extends StatelessWidget {
                           child: IconButton(
                             visualDensity: VisualDensity.compact,
                             onPressed: () async {
-                              final service =
-                              SavedScholarshipService();
-
-                              final studentId =
-                                  FirebaseAuth.instance.currentUser!.uid;
+                              final service = SavedScholarshipService();
+                              final studentId = FirebaseAuth.instance.currentUser!.uid;
 
                               if (isSaved) {
                                 await service.removeSavedScholarship(
@@ -924,12 +779,8 @@ class _ScholarshipCard extends StatelessWidget {
                               }
                             },
                             icon: Icon(
-                              isSaved
-                                  ? Icons.favorite_rounded
-                                  : Icons.favorite_border_rounded,
-                              color: isSaved
-                                  ? AppColors.error
-                                  : AppColors.textSecondary,
+                              isSaved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                              color: isSaved ? AppColors.error : AppColors.textSecondary,
                               size: 20,
                             ),
                           ),
@@ -972,7 +823,7 @@ class _ScholarshipCard extends StatelessWidget {
                     const SizedBox(height: 5),
                     Row(
                       children: [
-                        Icon(Icons.calendar_today, size: 13, color: Colors.grey),
+                        Icon(Icons.calendar_today, size: 13, color: AppColors.textSecondary),
                         const SizedBox(width: 4),
                         Text(
                           deadline,
@@ -1010,7 +861,18 @@ class _QuickAction extends StatelessWidget {
   Widget build(BuildContext context) {
     return _TapFeedback(
       borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
+
+      onTap: () {
+        if (title == "Eligible") {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+              const EligibleScholarshipsScreen(),
+            ),
+          );
+        }
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14),
         alignment: Alignment.centerLeft,
