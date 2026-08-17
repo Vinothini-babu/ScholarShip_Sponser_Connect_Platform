@@ -4,7 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
-import '../../../models/scholarship_model.dart';
+
+import '../../../models/application_model.dart';
+import '../../../services/application_service.dart';
 import '../../../services/saved_scholarship_service.dart';
 
 class EligibleScholarshipsScreen extends StatefulWidget {
@@ -25,9 +27,7 @@ class _EligibleScholarshipsScreenState
   SavedScholarshipService();
 
   double _toDouble(dynamic value) {
-    if (value == null) {
-      return 0;
-    }
+    if (value == null) return 0;
 
     if (value is num) {
       return value.toDouble();
@@ -125,11 +125,9 @@ class _EligibleScholarshipsScreenState
         backgroundColor: AppColors.background,
         elevation: 0,
         centerTitle: true,
-
         iconTheme: IconThemeData(
           color: AppColors.textPrimary,
         ),
-
         title: Text(
           "Eligible Scholarships",
           style: AppTextStyles.title.copyWith(
@@ -141,12 +139,10 @@ class _EligibleScholarshipsScreenState
 
       body: StreamBuilder<
           DocumentSnapshot<Map<String, dynamic>>>(
-        stream: _firestore
-            .collection("users")
-            .doc("student")
-            .collection(user.uid)
-            .doc("profile")
-            .snapshots(),
+          stream: _firestore
+              .collection("users")
+              .doc(user.uid)
+              .snapshots(),
 
         builder: (context, profileSnapshot) {
 
@@ -276,7 +272,6 @@ class _EligibleScholarshipsScreenState
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(30),
-
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -329,6 +324,7 @@ class _EligibleScholarshipCard extends StatefulWidget {
   final String amount;
   final String lastDate;
   final String eligibility;
+
   final SavedScholarshipService savedService;
   final String studentId;
 
@@ -350,7 +346,35 @@ class _EligibleScholarshipCard extends StatefulWidget {
 class _EligibleScholarshipCardState
     extends State<_EligibleScholarshipCard> {
 
+  final ApplicationService _applicationService =
+  ApplicationService();
+
+  bool _isApplying = false;
+  bool _isSaved = false;
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSaved();
+  }
+
+  Future<void> _checkSaved() async {
+    try {
+      final saved = await widget.savedService
+          .isSaved(
+        studentId: widget.studentId,
+        scholarshipId: widget.scholarshipId,
+      )
+          .first;
+
+      if (!mounted) return;
+
+      setState(() {
+        _isSaved = saved;
+      });
+    } catch (_) {}
+  }
 
   Future<void> _toggleSave() async {
     if (_isSaving) return;
@@ -360,25 +384,10 @@ class _EligibleScholarshipCardState
     });
 
     try {
-      final saved = await widget.savedService.isSaved(
-        studentId: widget.studentId,
-        scholarshipId: widget.scholarshipId,
-      ).first;
-
-      if (saved) {
+      if (_isSaved) {
         await widget.savedService.removeSavedScholarship(
           studentId: widget.studentId,
           scholarshipId: widget.scholarshipId,
-        );
-
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Scholarship removed from saved",
-            ),
-          ),
         );
       } else {
         await widget.savedService.saveScholarship(
@@ -388,17 +397,23 @@ class _EligibleScholarshipCardState
           amount: widget.amount,
           lastDate: widget.lastDate,
         );
-
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "❤️ Scholarship saved",
-            ),
-          ),
-        );
       }
+
+      if (!mounted) return;
+
+      setState(() {
+        _isSaved = !_isSaved;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isSaved
+                ? "Scholarship saved"
+                : "Scholarship removed",
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
 
@@ -418,307 +433,322 @@ class _EligibleScholarshipCardState
     }
   }
 
+  Future<void> _applyScholarship() async {
+    if (_isApplying) return;
+
+    setState(() {
+      _isApplying = true;
+    });
+
+    try {
+      final user =
+          FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        throw Exception("Please login again");
+      }
+
+      final profileSnapshot =
+      await FirebaseFirestore.instance
+          .collection("users")
+          .doc("student")
+          .collection(user.uid)
+          .doc("profile")
+          .get();
+
+      final profile =
+          profileSnapshot.data() ?? {};
+
+      final application =
+      ApplicationModel(
+        id: "",
+        studentId: user.uid,
+        studentName:
+        profile["name"]?.toString() ?? "",
+        studentEmail:
+        profile["email"]?.toString() ??
+            user.email ??
+            "",
+        studentCollege:
+        profile["college"]?.toString() ?? "",
+        sponsorId:
+        profile["sponsorId"]?.toString() ?? "",
+        scholarshipId:
+        widget.scholarshipId,
+        scholarshipTitle:
+        widget.title,
+        amount:
+        widget.amount,
+        status:
+        "Pending",
+        appliedAt:
+        Timestamp.now(),
+      );
+
+      final result =
+      await _applicationService
+          .applyScholarship(application);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result == "Success"
+                ? "Application submitted successfully"
+                : result == "Already Applied"
+                ? "You already applied for this scholarship"
+                : "Application failed",
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Unable to apply: $e",
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isApplying = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<bool>(
-      stream: widget.savedService.isSaved(
-        studentId: widget.studentId,
-        scholarshipId: widget.scholarshipId,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
+      child: Column(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
 
-      builder: (context, snapshot) {
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primary
+                      .withOpacity(0.10),
+                  borderRadius:
+                  BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  Icons.school_rounded,
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+              ),
 
-        final isSaved = snapshot.data ?? false;
+              const SizedBox(width: 14),
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(18),
+              Expanded(
+                child: Text(
+                  widget.title,
+                  style:
+                  AppTextStyles.subtitle.copyWith(
+                    fontSize: 16,
+                    fontWeight:
+                    FontWeight.bold,
+                    color:
+                    AppColors.textPrimary,
+                  ),
+                ),
+              ),
 
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(20),
-
-            border: Border.all(
-              color: AppColors.secondary
-                  .withOpacity(0.15),
-            ),
-
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 12,
-                offset: const Offset(0, 5),
+              IconButton(
+                onPressed:
+                _isSaving ? null : _toggleSave,
+                icon: Icon(
+                  _isSaved
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color:
+                  _isSaved
+                      ? AppColors.error
+                      : AppColors.textSecondary,
+                ),
               ),
             ],
           ),
 
-          child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
+          const SizedBox(height: 14),
 
+          Row(
             children: [
-
-              // =========================================
-              // HEADER
-              // =========================================
-
-              Row(
-                children: [
-
-                  Container(
-                    width: 50,
-                    height: 50,
-
-                    decoration: BoxDecoration(
-                      color: AppColors.secondary
-                          .withOpacity(0.12),
-                      borderRadius:
-                      BorderRadius.circular(14),
-                    ),
-
-                    child: Icon(
-                      Icons.school_rounded,
-                      color: AppColors.primary,
-                      size: 25,
-                    ),
-                  ),
-
-                  const SizedBox(width: 14),
-
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      maxLines: 2,
-                      overflow:
-                      TextOverflow.ellipsis,
-
-                      style:
-                      AppTextStyles.title.copyWith(
-                        fontSize: 16,
-                        color:
-                        AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-
-                  // =====================================
-                  // SAVE BUTTON
-                  // =====================================
-
-                  IconButton(
-                    onPressed:
-                    _isSaving
-                        ? null
-                        : _toggleSave,
-
-                    icon: _isSaving
-                        ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child:
-                      CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color:
-                        AppColors.primary,
-                      ),
-                    )
-                        : Icon(
-                      isSaved
-                          ? Icons.favorite_rounded
-                          : Icons
-                          .favorite_border_rounded,
-                      color: isSaved
-                          ? AppColors.error
-                          : AppColors
-                          .textSecondary,
-                    ),
-                  ),
-                ],
+              Icon(
+                Icons.currency_rupee_rounded,
+                size: 16,
+                color:
+                AppColors.textSecondary,
               ),
-
-              const SizedBox(height: 16),
-
-              // =========================================
-              // AMOUNT
-              // =========================================
-
-              Row(
-                children: [
-
-                  Icon(
-                    Icons.currency_rupee_rounded,
-                    size: 17,
-                    color: AppColors.primary,
-                  ),
-
-                  const SizedBox(width: 6),
-
-                  Text(
-                    widget.amount.isEmpty
-                        ? "Amount not specified"
-                        : widget.amount,
-
-                    style:
-                    AppTextStyles.subtitle.copyWith(
-                      fontSize: 14,
-                      fontWeight:
-                      FontWeight.w700,
-                      color:
-                      AppColors.textPrimary,
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 5),
+              Text(
+                widget.amount,
+                style:
+                AppTextStyles.subtitle.copyWith(
+                  fontWeight:
+                  FontWeight.w600,
+                  color:
+                  AppColors.textPrimary,
+                ),
               ),
+            ],
+          ),
 
-              const SizedBox(height: 10),
+          const SizedBox(height: 10),
 
-              // =========================================
-              // DEADLINE
-              // =========================================
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_today_rounded,
+                size: 15,
+                color:
+                AppColors.textSecondary,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                "Deadline: ${widget.lastDate}",
+                style:
+                AppTextStyles.subtitle.copyWith(
+                  fontSize: 13,
+                  color:
+                  AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
 
-              Row(
-                children: [
+          const SizedBox(height: 12),
 
-                  Icon(
-                    Icons.calendar_today_rounded,
-                    size: 15,
+          Container(
+            width: double.infinity,
+            padding:
+            const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.warning
+                  .withOpacity(0.08),
+              borderRadius:
+              BorderRadius.circular(12),
+            ),
+            child: Text(
+              widget.eligibility.isEmpty
+                  ? "Eligible based on your profile"
+                  : widget.eligibility,
+              style:
+              AppTextStyles.subtitle.copyWith(
+                fontSize: 12,
+                color:
+                AppColors.textPrimary,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          Container(
+            width: double.infinity,
+            padding:
+            const EdgeInsets.symmetric(
+              vertical: 9,
+              horizontal: 12,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.success
+                  .withOpacity(0.08),
+              borderRadius:
+              BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 17,
+                  color:
+                  AppColors.success,
+                ),
+                const SizedBox(width: 7),
+                Text(
+                  "Eligible for you",
+                  style:
+                  AppTextStyles.subtitle.copyWith(
+                    fontSize: 12,
+                    fontWeight:
+                    FontWeight.w600,
                     color:
-                    AppColors.textSecondary,
-                  ),
-
-                  const SizedBox(width: 6),
-
-                  Text(
-                    widget.lastDate.isEmpty
-                        ? "Deadline not specified"
-                        : "Deadline: ${widget.lastDate}",
-
-                    style:
-                    AppTextStyles.subtitle.copyWith(
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 14),
-
-              // =========================================
-              // ELIGIBILITY
-              // =========================================
-
-              if (widget.eligibility.isNotEmpty)
-                Container(
-                  width: double.infinity,
-
-                  padding:
-                  const EdgeInsets.all(12),
-
-                  decoration: BoxDecoration(
-                    color: AppColors.secondary
-                        .withOpacity(0.08),
-
-                    borderRadius:
-                    BorderRadius.circular(12),
-                  ),
-
-                  child: Row(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
-
-                    children: [
-
-                      Icon(
-                        Icons.verified_rounded,
-                        size: 18,
-                        color:
-                        AppColors.secondary,
-                      ),
-
-                      const SizedBox(width: 8),
-
-                      Expanded(
-                        child: Text(
-                          widget.eligibility,
-
-                          style: AppTextStyles
-                              .subtitle
-                              .copyWith(
-                            fontSize: 12,
-                            color:
-                            AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ],
+                    AppColors.success,
                   ),
                 ),
+              ],
+            ),
+          ),
 
-              const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-              // =========================================
-              // SAVED STATUS
-              // =========================================
-
-              Container(
-                width: double.infinity,
-
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed:
+              _isApplying
+                  ? null
+                  : _applyScholarship,
+              style:
+              ElevatedButton.styleFrom(
+                backgroundColor:
+                AppColors.primary,
+                foregroundColor:
+                Colors.white,
                 padding:
                 const EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 12,
+                  vertical: 13,
                 ),
-
-                decoration: BoxDecoration(
-                  color: isSaved
-                      ? AppColors.error
-                      .withOpacity(0.08)
-                      : AppColors.success
-                      .withOpacity(0.08),
-
+                shape:
+                RoundedRectangleBorder(
                   borderRadius:
-                  BorderRadius.circular(10),
-                ),
-
-                child: Row(
-                  children: [
-
-                    Icon(
-                      isSaved
-                          ? Icons.favorite_rounded
-                          : Icons.check_circle_rounded,
-
-                      size: 17,
-
-                      color: isSaved
-                          ? AppColors.error
-                          : AppColors.success,
-                    ),
-
-                    const SizedBox(width: 7),
-
-                    Text(
-                      isSaved
-                          ? "Saved"
-                          : "Eligible for you",
-
-                      style:
-                      AppTextStyles.subtitle.copyWith(
-                        fontSize: 12,
-                        fontWeight:
-                        FontWeight.w600,
-                        color: isSaved
-                            ? AppColors.error
-                            : AppColors.success,
-                      ),
-                    ),
-                  ],
+                  BorderRadius.circular(12),
                 ),
               ),
-            ],
+              child: _isApplying
+                  ? const SizedBox(
+                width: 20,
+                height: 20,
+                child:
+                CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+                  : const Text(
+                "Apply Now",
+                style: TextStyle(
+                  fontWeight:
+                  FontWeight.w600,
+                ),
+              ),
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
