@@ -432,7 +432,6 @@ class _EligibleScholarshipCardState
       }
     }
   }
-
   Future<void> _applyScholarship() async {
     if (_isApplying) return;
 
@@ -441,49 +440,105 @@ class _EligibleScholarshipCardState
     });
 
     try {
-      final user =
-          FirebaseAuth.instance.currentUser;
+      final user = FirebaseAuth.instance.currentUser;
 
       if (user == null) {
         throw Exception("Please login again");
       }
 
-      final profileSnapshot =
-      await FirebaseFirestore.instance
+      final firestore = FirebaseFirestore.instance;
+
+      // =========================================================
+      // GET STUDENT DATA
+      // =========================================================
+
+      final studentSnapshot = await firestore
           .collection("users")
-          .doc("student")
-          .collection(user.uid)
-          .doc("profile")
+          .doc(user.uid)
           .get();
 
-      final profile =
-          profileSnapshot.data() ?? {};
+      if (!studentSnapshot.exists) {
+        throw Exception("Student profile not found");
+      }
 
-      final application =
-      ApplicationModel(
+      final studentData = studentSnapshot.data() ?? {};
+
+      // DEBUG
+      print("====================================");
+      print("Student UID: ${user.uid}");
+      print("Student Name: ${studentData["name"]}");
+      print("Student College: ${studentData["college"]}");
+      print("Student Email: ${studentData["email"]}");
+      print("====================================");
+
+      // =========================================================
+      // GET SCHOLARSHIP DATA
+      // =========================================================
+
+      final scholarshipSnapshot = await firestore
+          .collection("scholarships")
+          .doc(widget.scholarshipId)
+          .get();
+
+      if (!scholarshipSnapshot.exists) {
+        throw Exception("Scholarship not found");
+      }
+
+      final scholarshipData =
+          scholarshipSnapshot.data() ?? {};
+
+      // =========================================================
+      // GET SPONSOR ID
+      // =========================================================
+
+      final sponsorId =
+          scholarshipData["sponsorId"]?.toString() ?? "";
+
+      if (sponsorId.isEmpty) {
+        throw Exception(
+          "Sponsor information is missing",
+        );
+      }
+
+      // =========================================================
+      // CREATE APPLICATION
+      // =========================================================
+
+      final application = ApplicationModel(
         id: "",
+
         studentId: user.uid,
+
         studentName:
-        profile["name"]?.toString() ?? "",
+        studentData["name"]?.toString() ?? "",
+
         studentEmail:
-        profile["email"]?.toString() ??
+        studentData["email"]?.toString() ??
             user.email ??
             "",
+
         studentCollege:
-        profile["college"]?.toString() ?? "",
-        sponsorId:
-        profile["sponsorId"]?.toString() ?? "",
+        studentData["college"]?.toString() ?? "",
+
+        sponsorId: sponsorId,
+
         scholarshipId:
         widget.scholarshipId,
+
         scholarshipTitle:
         widget.title,
+
         amount:
         widget.amount,
-        status:
-        "Pending",
-        appliedAt:
-        Timestamp.now(),
+
+        status: "Pending",
+
+        appliedAt: Timestamp.now(),
       );
+
+      // =========================================================
+      // SAVE APPLICATION
+      // =========================================================
 
       final result =
       await _applicationService
@@ -498,7 +553,7 @@ class _EligibleScholarshipCardState
                 ? "Application submitted successfully"
                 : result == "Already Applied"
                 ? "You already applied for this scholarship"
-                : "Application failed",
+                : "Application failed: $result",
           ),
         ),
       );
