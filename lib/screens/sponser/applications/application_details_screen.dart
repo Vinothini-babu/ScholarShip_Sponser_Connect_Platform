@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -285,6 +287,212 @@ class _ApplicationDetailsScreenState
     );
   }
 
+  Widget _uploadedDocumentsSection(
+      Map<String, String> documents,
+      ) {
+    if (documents.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.description_outlined,
+              size: 38,
+              color: AppColors.textSecondary,
+            ),
+
+            const SizedBox(height: 10),
+
+            Text(
+              "No Documents Uploaded",
+              textAlign: TextAlign.center,
+              style: AppTextStyles.subtitle.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+
+            const SizedBox(height: 5),
+
+            Text(
+              "The student has not uploaded any documents.",
+              textAlign: TextAlign.center,
+              style: AppTextStyles.subtitle.copyWith(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: documents.entries.map((entry) {
+        return _documentTile(
+          label: _documentLabel(entry.key),
+          path: entry.value,
+        );
+      }).toList(),
+    );
+  }
+
+  String _documentLabel(String key) {
+    switch (key) {
+      case "marksheet":
+        return "Marksheet";
+
+      case "idProof":
+        return "ID Proof";
+
+      case "incomeCertificate":
+        return "Income Certificate";
+
+      case "collegeId":
+        return "College ID";
+
+      default:
+        return key;
+    }
+  }
+
+
+
+  Widget _documentTile({
+    required String label,
+    required String path,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.textSecondary.withOpacity(0.10),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(
+              Icons.description_rounded,
+              color: AppColors.primary,
+              size: 21,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: AppTextStyles.subtitle.copyWith(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+
+                const SizedBox(height: 3),
+
+                Text(
+                  path,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.subtitle.copyWith(
+                    fontSize: 10,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          IconButton(
+            onPressed: () => _openDocument(path),
+            icon: Icon(
+              Icons.folder_open_rounded,
+              color: AppColors.primary,
+              size: 21,
+            ),
+            tooltip: "Open Document",
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openDocument(String path) async {
+    if (path.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Document path is not available"),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final file = File(path);
+
+      if (!await file.exists()) {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Document not found on this computer",
+            ),
+          ),
+        );
+        return;
+      }
+
+      final uri = Uri.file(file.path);
+
+      final opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Unable to open document"),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Unable to open document: $e",
+          ),
+        ),
+      );
+    }
+  }
+
   // =========================================================
   // BUILD
   // =========================================================
@@ -493,75 +701,14 @@ class _ApplicationDetailsScreenState
             ),
 
             // =================================================
-            // DOCUMENTS PLACEHOLDER
+            // UPLOADED DOCUMENTS
             // =================================================
 
             _sectionCard(
-              title:
-              "Uploaded Documents",
-
-              icon:
-              Icons.folder_copy_outlined,
-
-              child: Container(
-                width: double.infinity,
-
-                padding:
-                const EdgeInsets.all(16),
-
-                decoration: BoxDecoration(
-                  color:
-                  AppColors.background,
-
-                  borderRadius:
-                  BorderRadius.circular(14),
-                ),
-
-                child: Column(
-                  children: [
-
-                    Icon(
-                      Icons.description_outlined,
-                      size: 38,
-                      color:
-                      AppColors.textSecondary,
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    Text(
-                      "Documents will appear here",
-                      textAlign:
-                      TextAlign.center,
-
-                      style:
-                      AppTextStyles.subtitle
-                          .copyWith(
-                        fontWeight:
-                        FontWeight.w600,
-                        color:
-                        AppColors.textPrimary,
-                      ),
-                    ),
-
-                    const SizedBox(height: 5),
-
-                    Text(
-                      "Student uploaded documents "
-                          "will be connected here.",
-                      textAlign:
-                      TextAlign.center,
-
-                      style:
-                      AppTextStyles.subtitle
-                          .copyWith(
-                        fontSize: 12,
-                        color:
-                        AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
+              title: "Uploaded Documents",
+              icon: Icons.folder_copy_outlined,
+              child: _uploadedDocumentsSection(
+                application.documents,
               ),
             ),
 

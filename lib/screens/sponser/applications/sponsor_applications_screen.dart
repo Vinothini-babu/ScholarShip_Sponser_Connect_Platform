@@ -459,8 +459,14 @@ class _ApplicationCard extends StatelessWidget {
 
             child: OutlinedButton(
               onPressed: () {
-                // Details screen will be connected
-                // in the next step.
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ApplicationDetailsScreen(
+                      application: application,
+                    ),
+                  ),
+                );
               },
 
               style:

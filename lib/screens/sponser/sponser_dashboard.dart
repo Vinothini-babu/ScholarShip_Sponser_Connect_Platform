@@ -6,7 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import 'add_scholarship_screen.dart';
 import 'manage_scholarship_screen.dart';
-import 'applications_screen.dart';
+import 'applications/sponsor_applications_screen.dart';
 import 'sponsor_profile_screen.dart';
 
 class SponsorDashboard extends StatelessWidget {
@@ -124,7 +124,9 @@ class SponsorDashboard extends StatelessWidget {
                           accent: AppColors.success,
                           onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const ApplicationsScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => SponsorApplicationsScreen(),
+                            ),
                           ),
                         ),
                       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -353,6 +354,10 @@ class _EligibleScholarshipCardState
   bool _isSaved = false;
   bool _isSaving = false;
 
+  Map<String, String> _documents = {};
+
+  bool _isPickingDocument = false;
+
   @override
   void initState() {
     super.initState();
@@ -432,6 +437,249 @@ class _EligibleScholarshipCardState
       }
     }
   }
+  Future<void> _pickDocument(String documentType) async {
+    if (_isPickingDocument) return;
+
+    setState(() {
+      _isPickingDocument = true;
+    });
+
+    try {
+      final List<PlatformFile> result =
+      await FilePicker.pickFiles(
+        type: FileType.any,
+        allowMultiple: false,
+      );
+
+      if (result.isEmpty) {
+        return;
+      }
+
+      final PlatformFile file = result.first;
+
+      if (file.path == null || file.path!.isEmpty) {
+        throw Exception("Unable to get selected file path");
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _documents[documentType] = file.path!;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "${_documentLabel(documentType)} selected",
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Unable to select document: $e",
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPickingDocument = false;
+        });
+      }
+    }
+  }
+  String _documentLabel(String documentType) {
+    switch (documentType) {
+      case "marksheet":
+        return "Marksheet";
+
+      case "idProof":
+        return "ID Proof";
+
+      case "incomeCertificate":
+        return "Income Certificate";
+
+      case "collegeId":
+        return "College ID";
+
+      default:
+        return "Document";
+    }
+  }
+  Widget _documentUploadSection() {
+    final documents = [
+      {
+        "key": "marksheet",
+        "title": "Marksheet",
+        "icon": Icons.description_outlined,
+      },
+      {
+        "key": "idProof",
+        "title": "ID Proof",
+        "icon": Icons.badge_outlined,
+      },
+      {
+        "key": "incomeCertificate",
+        "title": "Income Certificate",
+        "icon": Icons.account_balance_outlined,
+      },
+      {
+        "key": "collegeId",
+        "title": "College ID",
+        "icon": Icons.school_outlined,
+      },
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.12),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.folder_copy_outlined,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "Upload Documents",
+                style: AppTextStyles.title.copyWith(
+                  fontSize: 16,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+
+          Text(
+            "Upload the documents required for this scholarship.",
+            style: AppTextStyles.subtitle.copyWith(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          ...documents.map((document) {
+            final key = document["key"] as String;
+            final title = document["title"] as String;
+            final icon = document["icon"] as IconData;
+
+            final selectedPath = _documents[key];
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style:
+                          AppTextStyles.subtitle.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+
+                        const SizedBox(height: 3),
+
+                        Text(
+                          selectedPath == null
+                              ? "No file selected"
+                              : selectedPath.split('\\').last,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                          AppTextStyles.subtitle.copyWith(
+                            fontSize: 11,
+                            color: selectedPath == null
+                                ? AppColors.textSecondary
+                                : AppColors.success,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(width: 8),
+
+                  OutlinedButton(
+                    onPressed: _isPickingDocument
+                        ? null
+                        : () => _pickDocument(key),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(
+                        color: AppColors.primary,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                        BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      selectedPath == null
+                          ? "Choose"
+                          : "Change",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
   Future<void> _applyScholarship() async {
     if (_isApplying) return;
 
@@ -449,7 +697,7 @@ class _EligibleScholarshipCardState
       final firestore = FirebaseFirestore.instance;
 
       // =========================================================
-      // GET STUDENT DATA
+      // 1. GET STUDENT PROFILE
       // =========================================================
 
       final studentSnapshot = await firestore
@@ -461,18 +709,36 @@ class _EligibleScholarshipCardState
         throw Exception("Student profile not found");
       }
 
-      final studentData = studentSnapshot.data() ?? {};
+      final studentData = studentSnapshot.data()!;
 
-      // DEBUG
+      final studentName =
+          studentData["name"]?.toString().trim() ?? "";
+
+      final studentCollege =
+          studentData["college"]?.toString().trim() ?? "";
+
+      final studentEmail =
+          studentData["email"]?.toString().trim() ??
+              user.email ??
+              "";
+
       print("====================================");
-      print("Student UID: ${user.uid}");
-      print("Student Name: ${studentData["name"]}");
-      print("Student College: ${studentData["college"]}");
-      print("Student Email: ${studentData["email"]}");
+      print("Student UID     : ${user.uid}");
+      print("Student Name   : $studentName");
+      print("Student College: $studentCollege");
+      print("Student Email  : $studentEmail");
       print("====================================");
+
+      if (studentName.isEmpty) {
+        throw Exception("Student name is empty in profile");
+      }
+
+      if (studentCollege.isEmpty) {
+        throw Exception("Student college is empty in profile");
+      }
 
       // =========================================================
-      // GET SCHOLARSHIP DATA
+      // 2. GET SCHOLARSHIP
       // =========================================================
 
       final scholarshipSnapshot = await firestore
@@ -484,65 +750,60 @@ class _EligibleScholarshipCardState
         throw Exception("Scholarship not found");
       }
 
+      // IMPORTANT:
+      // scholarshipData is declared here
       final scholarshipData =
-          scholarshipSnapshot.data() ?? {};
+      scholarshipSnapshot.data()!;
 
       // =========================================================
-      // GET SPONSOR ID
+      // 3. GET SPONSOR ID FROM SCHOLARSHIP
       // =========================================================
 
       final sponsorId =
-          scholarshipData["sponsorId"]?.toString() ?? "";
+          scholarshipData["sponsorId"]?.toString().trim() ?? "";
+
+      print("Sponsor ID: $sponsorId");
 
       if (sponsorId.isEmpty) {
         throw Exception(
-          "Sponsor information is missing",
+          "Sponsor information is missing for this scholarship",
         );
       }
 
       // =========================================================
-      // CREATE APPLICATION
+       // 4. CREATE APPLICATION
       // =========================================================
-
       final application = ApplicationModel(
         id: "",
-
         studentId: user.uid,
-
-        studentName:
-        studentData["name"]?.toString() ?? "",
-
-        studentEmail:
-        studentData["email"]?.toString() ??
-            user.email ??
-            "",
-
-        studentCollege:
-        studentData["college"]?.toString() ?? "",
-
+        studentName: studentData["name"]?.toString() ?? "",
+        studentEmail: studentData["email"]?.toString() ?? "",
+        studentCollege: studentData["college"]?.toString() ?? "",
         sponsorId: sponsorId,
-
-        scholarshipId:
-        widget.scholarshipId,
-
-        scholarshipTitle:
-        widget.title,
-
-        amount:
-        widget.amount,
-
+        scholarshipId: widget.scholarshipId,
+        scholarshipTitle: widget.title,
+        amount: widget.amount,
         status: "Pending",
-
         appliedAt: Timestamp.now(),
+        documents: _documents,
       );
 
       // =========================================================
-      // SAVE APPLICATION
+      // 5. DEBUG - CHECK DATA BEFORE SAVING
+      // =========================================================
+
+      print("========== SAVING APPLICATION ==========");
+      print(application.toMap());
+      print("========================================");
+
+      // =========================================================
+      // 6. SAVE APPLICATION
       // =========================================================
 
       final result =
-      await _applicationService
-          .applyScholarship(application);
+      await _applicationService.applyScholarship(
+        application,
+      );
 
       if (!mounted) return;
 
@@ -559,6 +820,8 @@ class _EligibleScholarshipCardState
       );
     } catch (e) {
       if (!mounted) return;
+
+      print("APPLICATION ERROR: $e");
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -757,6 +1020,9 @@ class _EligibleScholarshipCardState
               ],
             ),
           ),
+          const SizedBox(height: 14),
+
+          _documentUploadSection(),
 
           const SizedBox(height: 14),
 

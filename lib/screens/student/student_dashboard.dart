@@ -516,25 +516,24 @@ class _StatsGrid extends StatelessWidget {
 
             // =================================================
             // 3. SAVED
-            // =================================================
-
+            // ==================================================
             StreamBuilder<int>(
-              stream:
-              savedService.getSavedCount(studentId),
+              stream: savedService.getSavedCount(studentId),
               builder: (context, snapshot) {
-                final count =
-                    snapshot.data ?? 0;
+                final count = snapshot.data ?? 0;
 
                 return _buildStatCard(
                   icon: Icons.favorite_rounded,
                   title: "Saved",
                   value: "$count",
                   color: AppColors.error,
+
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => SearchScreen(),
+                        builder: (_) =>
+                          SavedScholarshipsScreen(),
                       ),
                     );
                   },

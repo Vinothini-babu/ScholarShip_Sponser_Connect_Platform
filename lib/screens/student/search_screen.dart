@@ -695,6 +695,8 @@ class _ScholarshipTileState
 
         appliedAt:
         Timestamp.now(),
+
+        documents: {},
       );
 
       // ========================================

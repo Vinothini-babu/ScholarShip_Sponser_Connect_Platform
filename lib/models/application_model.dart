@@ -14,6 +14,7 @@ class ApplicationModel {
   final String amount;
   final String status;
   final Timestamp appliedAt;
+  final Map<String, String> documents;
 
   ApplicationModel({
     required this.id,
@@ -27,6 +28,7 @@ class ApplicationModel {
     required this.amount,
     required this.status,
     required this.appliedAt,
+    required this.documents,
   });
 
   Map<String, dynamic> toMap() {
@@ -43,6 +45,7 @@ class ApplicationModel {
       'amount': amount,
       'status': status,
       'appliedAt': appliedAt,
+      'documentPath': documents,
     };
   }
 
@@ -64,6 +67,8 @@ class ApplicationModel {
       amount: map['amount'] ?? '',
       status: map['status'] ?? 'Pending',
       appliedAt: map['appliedAt'] ?? Timestamp.now(),
-    );
+      documents: Map<String, String>.from(
+        map['documents'] ?? {},
+      ),    );
   }
 }
