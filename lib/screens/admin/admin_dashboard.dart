@@ -18,6 +18,8 @@ class AdminDashboard extends StatelessWidget {
     required IconData icon,
     required Color color,
     required String collection,
+    required VoidCallback onTap,
+
   }) {
     return StreamBuilder<QuerySnapshot>(
       stream: collection == "students"
@@ -122,6 +124,14 @@ class AdminDashboard extends StatelessWidget {
                           icon: Icons.people,
                           color: Colors.blue,
                           collection: "students",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ManageStudentsScreen(),
+                              ),
+                            );
+                          },
                         ),
                       ),
 
@@ -133,6 +143,14 @@ class AdminDashboard extends StatelessWidget {
                           icon: Icons.school,
                           color: Colors.orange,
                           collection: "scholarships",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ManageScholarshipsScreen(),
+                              ),
+                            );
+                          },
                         ),
                       ),
 
@@ -150,6 +168,14 @@ class AdminDashboard extends StatelessWidget {
                           icon: Icons.assignment,
                           color: Colors.green,
                           collection: "applications",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ViewApplicationsScreen(),
+                              ),
+                            );
+                          },
                         ),
                       ),
 
@@ -161,6 +187,14 @@ class AdminDashboard extends StatelessWidget {
                           icon: Icons.business,
                           color: Colors.purple,
                           collection: "sponsors",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ManageSponsorsScreen(),
+                              ),
+                            );
+                          },
                         ),
                       ),
 
@@ -186,8 +220,7 @@ class AdminDashboard extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                const ManageStudentsScreen(),
+                                builder: (_) => const ManageStudentsScreen(),
                               ),
                             );
                           },
@@ -205,8 +238,7 @@ class AdminDashboard extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                const ManageSponsorsScreen(),
+                                builder: (_) => const ManageSponsorsScreen(),
                               ),
                             );
                           },
@@ -228,8 +260,7 @@ class AdminDashboard extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                const ManageScholarshipsScreen(),
+                                builder: (_) => const ManageScholarshipsScreen(),
                               ),
                             );
                           },
@@ -247,8 +278,7 @@ class AdminDashboard extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                const ViewApplicationsScreen(),
+                                builder: (_) => const ViewApplicationsScreen(),
                               ),
                             );
                           },
