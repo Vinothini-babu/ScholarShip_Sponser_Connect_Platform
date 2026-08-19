@@ -8,6 +8,8 @@ import 'add_scholarship_screen.dart';
 import 'manage_scholarship_screen.dart';
 import 'applications/sponsor_applications_screen.dart';
 import 'sponsor_profile_screen.dart';
+import 'dashboard/approved_students_screen.dart';
+
 
 class SponsorDashboard extends StatelessWidget {
   const SponsorDashboard({super.key});
@@ -171,6 +173,16 @@ class SponsorDashboard extends StatelessWidget {
                         label: "Total Scholarships",
                         value: "$totalScholarships",
                         accent: AppColors.primary,
+
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                              const ManageScholarshipsScreen(),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -193,24 +205,49 @@ class SponsorDashboard extends StatelessWidget {
                           applicationSnapshot.data?.docs.where((doc) {
                             final data = doc.data() as Map<String, dynamic>;
                             return data["status"] == "Approved";
-                          }).length ?? 0;
+                          }).length ??
+                              0;
 
                       return Column(
                         children: [
+                          // ==============================
+                          // APPLICATIONS RECEIVED
+                          // ==============================
+
                           _OverviewTile(
-                            icon: Icons.people_rounded,
+                            icon: Icons.assignment_rounded,
                             label: "Applications Received",
                             value: "$totalApplications",
                             accent: AppColors.success,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>  SponsorApplicationsScreen(),
+                                ),
+                              );
+                            },
                           ),
 
                           const SizedBox(height: 12),
+
+                          // ==============================
+                          // APPROVED STUDENTS
+                          // ==============================
 
                           _OverviewTile(
                             icon: Icons.check_circle_rounded,
                             label: "Approved Students",
                             value: "$approvedApplications",
                             accent: AppColors.secondary,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ApprovedStudentsScreen(),
+                                ),
+                              );
+                            },
                           ),
                         ],
                       );
@@ -300,59 +337,97 @@ class _OverviewTile extends StatelessWidget {
   final String label;
   final String value;
   final Color accent;
+  final VoidCallback? onTap;
 
   const _OverviewTile({
     required this.icon,
     required this.label,
     required this.value,
     required this.accent,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: accent.withOpacity(0.13),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: accent, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              label,
-              style: AppTextStyles.subtitle.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+    final radius = BorderRadius.circular(16);
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: radius,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        splashColor: accent.withOpacity(0.10),
+        highlightColor: accent.withOpacity(0.05),
+
+        child: Container(
+          padding: const EdgeInsets.all(16),
+
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: radius,
+
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-            ),
+            ],
           ),
-          Text(
-            value,
-            style: AppTextStyles.title.copyWith(
-              fontSize: 19,
-              color: AppColors.textPrimary,
-            ),
+
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.13),
+                  borderRadius:
+                  BorderRadius.circular(12),
+                ),
+
+                child: Icon(
+                  icon,
+                  color: accent,
+                  size: 20,
+                ),
+              ),
+
+              const SizedBox(width: 14),
+
+              Expanded(
+                child: Text(
+                  label,
+                  style: AppTextStyles.subtitle.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+
+              Text(
+                value,
+                style: AppTextStyles.title.copyWith(
+                  fontSize: 19,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+
+              if (onTap != null) ...[
+                const SizedBox(width: 8),
+
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

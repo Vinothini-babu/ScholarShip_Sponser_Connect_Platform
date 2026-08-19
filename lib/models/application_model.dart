@@ -53,22 +53,46 @@ class ApplicationModel {
       Map<String, dynamic> map,
       String id,
       ) {
+    final documentData =
+        map['documentPath'] ?? map['documents'] ?? {};
+
     return ApplicationModel(
       id: id,
-      studentId: map['studentId'] ?? '',
-      studentName: map['studentName'] ?? '',
-      studentEmail: map['studentEmail'] ?? '',
-      studentCollege: map['studentCollege'] ?? '',
 
-      sponsorId: map['sponsorId'] ?? '',
+      studentId:
+      map['studentId'] ?? '',
 
-      scholarshipId: map['scholarshipId'] ?? '',
-      scholarshipTitle: map['scholarshipTitle'] ?? '',
-      amount: map['amount'] ?? '',
-      status: map['status'] ?? 'Pending',
-      appliedAt: map['appliedAt'] ?? Timestamp.now(),
-      documents: Map<String, String>.from(
-        map['documents'] ?? {},
-      ),    );
+      studentName:
+      map['studentName'] ?? '',
+
+      studentEmail:
+      map['studentEmail'] ?? '',
+
+      studentCollege:
+      map['studentCollege'] ?? '',
+
+      sponsorId:
+      map['sponsorId'] ?? '',
+
+      scholarshipId:
+      map['scholarshipId'] ?? '',
+
+      scholarshipTitle:
+      map['scholarshipTitle'] ?? '',
+
+      amount:
+      map['amount'] ?? '',
+
+      status:
+      map['status'] ?? 'Pending',
+
+      appliedAt:
+      map['appliedAt'] ?? Timestamp.now(),
+
+      documents:
+      Map<String, String>.from(
+        documentData,
+      ),
+    );
   }
 }

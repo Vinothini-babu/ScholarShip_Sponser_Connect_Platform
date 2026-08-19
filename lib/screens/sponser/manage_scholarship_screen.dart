@@ -186,8 +186,7 @@ class _ManageScholarshipsScreenState extends State<ManageScholarshipsScreen> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (_) => EditScholarshipScreen(
-                                          documentId: doc.id,
-                                          scholarship: scholarship,
+                                          scholarshipId: doc.id,
                                         ),
                                       ),
                                     );
