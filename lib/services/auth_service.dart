@@ -20,7 +20,7 @@ class AuthService {
     required String role,
   }) async {
     // Create Firebase Authentication account
-    UserCredential userCredential =
+    final UserCredential userCredential =
     await _auth.createUserWithEmailAndPassword(
       email: email,
       password: password,
@@ -28,16 +28,15 @@ class AuthService {
 
     final String uid = userCredential.user!.uid;
 
-    // Convert role into a safe collection name
-    final String roleCollection =
+    final String userRole =
     role.toLowerCase().trim();
 
-    // Save user according to role
+    // IMPORTANT:
+    // Store every user directly inside users/{uid}
+    // This makes dashboard counts and role checking work correctly.
     await _firestore
         .collection("users")
-        .doc(roleCollection)
-        .collection(uid)
-        .doc("profile")
+        .doc(uid)
         .set({
       "uid": uid,
       "name": name,
@@ -45,7 +44,7 @@ class AuthService {
       "mobile": mobile,
       "college": college,
       "course": course,
-      "role": roleCollection,
+      "role": userRole,
       "createdAt": FieldValue.serverTimestamp(),
     });
 
@@ -61,7 +60,7 @@ class AuthService {
     required String password,
   }) async {
     return await _auth.signInWithEmailAndPassword(
-      email: email,
+      email: email.trim(),
       password: password,
     );
   }
@@ -71,17 +70,18 @@ class AuthService {
   // =========================
 
   Future<String> getUserRole() async {
-    final user = _auth.currentUser;
+    final User? user = _auth.currentUser;
 
     if (user == null) {
       throw Exception("Current user is null");
     }
 
-    final uid = user.uid;
+    final String uid = user.uid;
 
     print("🔥 GET ROLE UID: $uid");
 
-    final doc = await _firestore
+    final DocumentSnapshot<Map<String, dynamic>> doc =
+    await _firestore
         .collection("users")
         .doc(uid)
         .get();
@@ -95,17 +95,45 @@ class AuthService {
       );
     }
 
-    final data = doc.data();
+    final Map<String, dynamic>? data = doc.data();
 
     if (data == null) {
-      throw Exception("User document data is null");
+      throw Exception(
+        "User document data is null",
+      );
     }
 
-    if (!data.containsKey("role")) {
-      throw Exception("Role field not found in users/$uid");
+    final dynamic role = data["role"];
+
+    if (role == null) {
+      throw Exception(
+        "Role field not found in users/$uid",
+      );
     }
 
-    return data["role"].toString().toLowerCase().trim();
+    return role
+        .toString()
+        .toLowerCase()
+        .trim();
+  }
+
+  // =========================
+  // GET CURRENT USER DATA
+  // =========================
+
+  Future<Map<String, dynamic>?> getCurrentUserData() async {
+    final User? user = _auth.currentUser;
+
+    if (user == null) {
+      return null;
+    }
+
+    final doc = await _firestore
+        .collection("users")
+        .doc(user.uid)
+        .get();
+
+    return doc.data();
   }
 
   // =========================

@@ -68,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (role == "admin") {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const AdminDashboard()),
+          MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
