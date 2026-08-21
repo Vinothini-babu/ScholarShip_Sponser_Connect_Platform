@@ -51,19 +51,17 @@ class AdminDashboardScreen extends StatelessWidget {
 
                     const SizedBox(height: 24),
 
-                    // ==============================
+                    // ==========================================
                     // STATISTICS
-                    // ==============================
+                    // ==========================================
 
                     _buildStatistics(),
 
-
-
                     const SizedBox(height: 30),
 
-                    // ==============================
+                    // ==========================================
                     // APPLICATION STATUS
-                    // ==============================
+                    // ==========================================
 
                     Text(
                       "Application Status",
@@ -78,9 +76,9 @@ class AdminDashboardScreen extends StatelessWidget {
 
                     const SizedBox(height: 30),
 
-                    // ==============================
+                    // ==========================================
                     // RECENT APPLICATIONS
-                    // ==============================
+                    // ==========================================
 
                     _buildSectionHeader(
                       title: "Recent Applications",
@@ -90,7 +88,9 @@ class AdminDashboardScreen extends StatelessWidget {
                           context,
                           MaterialPageRoute(
                             builder: (_) =>
-                            const ViewApplicationsScreen(),
+                            const ViewApplicationsScreen(
+                              initialFilter: "All",
+                            ),
                           ),
                         );
                       },
@@ -102,9 +102,9 @@ class AdminDashboardScreen extends StatelessWidget {
 
                     const SizedBox(height: 30),
 
-                    // ==============================
+                    // ==========================================
                     // RECENT SCHOLARSHIPS
-                    // ==============================
+                    // ==========================================
 
                     _buildSectionHeader(
                       title: "Recent Scholarships",
@@ -126,9 +126,9 @@ class AdminDashboardScreen extends StatelessWidget {
 
                     const SizedBox(height: 30),
 
-                    // ==============================
+                    // ==========================================
                     // QUICK ACTIONS
-                    // ==============================
+                    // ==========================================
 
                     Text(
                       "Quick Actions",
@@ -240,46 +240,33 @@ class AdminDashboardScreen extends StatelessWidget {
   // ============================================================
   // STATISTICS
   // ============================================================
+
   Widget _buildStatistics() {
     return StreamBuilder<QuerySnapshot>(
-      // =========================
-      // USERS
-      // =========================
       stream: FirebaseFirestore.instance
           .collection("users")
           .snapshots(),
-
       builder: (context, usersSnapshot) {
-        final usersCount = usersSnapshot.data?.docs.length ?? 0;
+        final usersCount =
+            usersSnapshot.data?.docs.length ?? 0;
 
         return StreamBuilder<QuerySnapshot>(
-          // =========================
-          // SCHOLARSHIPS
-          // =========================
           stream: FirebaseFirestore.instance
               .collection("scholarships")
               .snapshots(),
-
           builder: (context, scholarshipSnapshot) {
             final scholarshipCount =
                 scholarshipSnapshot.data?.docs.length ?? 0;
 
             return StreamBuilder<QuerySnapshot>(
-              // =========================
-              // APPLICATIONS
-              // =========================
               stream: FirebaseFirestore.instance
                   .collection("applications")
                   .snapshots(),
-
               builder: (context, applicationSnapshot) {
                 final applicationCount =
                     applicationSnapshot.data?.docs.length ?? 0;
 
                 return StreamBuilder<QuerySnapshot>(
-                  // =========================
-                  // SPONSORS
-                  // =========================
                   stream: FirebaseFirestore.instance
                       .collection("users")
                       .where(
@@ -287,17 +274,14 @@ class AdminDashboardScreen extends StatelessWidget {
                     isEqualTo: "sponsor",
                   )
                       .snapshots(),
-
                   builder: (context, sponsorSnapshot) {
                     final sponsorCount =
                         sponsorSnapshot.data?.docs.length ?? 0;
 
                     return LayoutBuilder(
                       builder: (context, constraints) {
-                        final width = constraints.maxWidth;
-
                         final cards = [
-                          _StatCard(
+                          _AdminStatCard(
                             icon: Icons.people_alt_rounded,
                             title: "Total Users",
                             value: "$usersCount",
@@ -313,7 +297,7 @@ class AdminDashboardScreen extends StatelessWidget {
                             },
                           ),
 
-                          _StatCard(
+                          _AdminStatCard(
                             icon: Icons.school_rounded,
                             title: "Scholarships",
                             value: "$scholarshipCount",
@@ -329,7 +313,7 @@ class AdminDashboardScreen extends StatelessWidget {
                             },
                           ),
 
-                          _StatCard(
+                          _AdminStatCard(
                             icon: Icons.assignment_rounded,
                             title: "Applications",
                             value: "$applicationCount",
@@ -339,13 +323,15 @@ class AdminDashboardScreen extends StatelessWidget {
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) =>
-                                  const ViewApplicationsScreen(),
+                                  const ViewApplicationsScreen(
+                                    initialFilter: "All",
+                                  ),
                                 ),
                               );
                             },
                           ),
 
-                          _StatCard(
+                          _AdminStatCard(
                             icon: Icons.business_rounded,
                             title: "Sponsors",
                             value: "$sponsorCount",
@@ -362,39 +348,27 @@ class AdminDashboardScreen extends StatelessWidget {
                           ),
                         ];
 
-                        // =========================
-                        // DESKTOP
-                        // =========================
-                        if (width > 800) {
+                        if (constraints.maxWidth > 800) {
                           return Row(
                             children: [
-                              for (int i = 0;
-                              i < cards.length;
-                              i++) ...[
-                                Expanded(
-                                  child: cards[i],
-                                ),
-                                if (i != cards.length - 1)
-                                  const SizedBox(width: 14),
-                              ],
+                              Expanded(child: cards[0]),
+                              const SizedBox(width: 14),
+                              Expanded(child: cards[1]),
+                              const SizedBox(width: 14),
+                              Expanded(child: cards[2]),
+                              const SizedBox(width: 14),
+                              Expanded(child: cards[3]),
                             ],
                           );
                         }
 
-                        // =========================
-                        // MOBILE / SMALL SCREEN
-                        // =========================
                         return Column(
                           children: [
                             Row(
                               children: [
-                                Expanded(
-                                  child: cards[0],
-                                ),
+                                Expanded(child: cards[0]),
                                 const SizedBox(width: 12),
-                                Expanded(
-                                  child: cards[1],
-                                ),
+                                Expanded(child: cards[1]),
                               ],
                             ),
 
@@ -402,13 +376,9 @@ class AdminDashboardScreen extends StatelessWidget {
 
                             Row(
                               children: [
-                                Expanded(
-                                  child: cards[2],
-                                ),
+                                Expanded(child: cards[2]),
                                 const SizedBox(width: 12),
-                                Expanded(
-                                  child: cards[3],
-                                ),
+                                Expanded(child: cards[3]),
                               ],
                             ),
                           ],
@@ -458,29 +428,76 @@ class AdminDashboardScreen extends StatelessWidget {
           }
         }
 
+        final cards = [
+          // ==========================================
+          // PENDING
+          // ==========================================
+
+          _AdminStatusCard(
+            icon: Icons.hourglass_top_rounded,
+            title: "Pending",
+            value: "$pending",
+            color: Colors.orange,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                  const ViewApplicationsScreen(
+                    initialFilter: "Pending",
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // ==========================================
+          // APPROVED
+          // ==========================================
+
+          _AdminStatusCard(
+            icon: Icons.check_circle_rounded,
+            title: "Approved",
+            value: "$approved",
+            color: Colors.green,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                  const ViewApplicationsScreen(
+                    initialFilter: "Approved",
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // ==========================================
+          // REJECTED
+          // ==========================================
+
+          _AdminStatusCard(
+            icon: Icons.cancel_rounded,
+            title: "Rejected",
+            value: "$rejected",
+            color: Colors.red,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                  const ViewApplicationsScreen(
+                    initialFilter: "Rejected",
+                  ),
+                ),
+              );
+            },
+          ),
+        ];
+
         return LayoutBuilder(
           builder: (context, constraints) {
-            final cards = [
-              _StatusCard(
-                icon: Icons.hourglass_top_rounded,
-                title: "Pending",
-                value: "$pending",
-                color: Colors.orange,
-              ),
-              _StatusCard(
-                icon: Icons.check_circle_rounded,
-                title: "Approved",
-                value: "$approved",
-                color: Colors.green,
-              ),
-              _StatusCard(
-                icon: Icons.cancel_rounded,
-                title: "Rejected",
-                value: "$rejected",
-                color: Colors.red,
-              ),
-            ];
-
             if (constraints.maxWidth > 700) {
               return Row(
                 children: [
@@ -520,10 +537,12 @@ class AdminDashboardScreen extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState ==
             ConnectionState.waiting) {
-          return const _LoadingCard();
+          return const _AdminLoadingCard();
         }
 
-        final docs = [...?snapshot.data?.docs];
+        final docs = [
+          ...?snapshot.data?.docs,
+        ];
 
         docs.sort((a, b) {
           final aData =
@@ -542,10 +561,11 @@ class AdminDashboardScreen extends StatelessWidget {
           return 0;
         });
 
-        final recentDocs = docs.take(5).toList();
+        final recentDocs =
+        docs.take(5).toList();
 
         if (recentDocs.isEmpty) {
-          return const _EmptyCard(
+          return const _AdminEmptyCard(
             icon: Icons.assignment_outlined,
             message: "No applications yet",
           );
@@ -568,10 +588,9 @@ class AdminDashboardScreen extends StatelessWidget {
                 data["status"]?.toString() ??
                     "Pending";
 
-            return _RecentApplicationCard(
+            return _AdminRecentApplicationCard(
               studentName: studentName,
-              scholarshipTitle:
-              scholarshipTitle,
+              scholarshipTitle: scholarshipTitle,
               status: status,
             );
           }).toList(),
@@ -592,10 +611,12 @@ class AdminDashboardScreen extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState ==
             ConnectionState.waiting) {
-          return const _LoadingCard();
+          return const _AdminLoadingCard();
         }
 
-        final docs = [...?snapshot.data?.docs];
+        final docs = [
+          ...?snapshot.data?.docs,
+        ];
 
         docs.sort((a, b) {
           final aData =
@@ -614,10 +635,11 @@ class AdminDashboardScreen extends StatelessWidget {
           return 0;
         });
 
-        final recentDocs = docs.take(4).toList();
+        final recentDocs =
+        docs.take(4).toList();
 
         if (recentDocs.isEmpty) {
-          return const _EmptyCard(
+          return const _AdminEmptyCard(
             icon: Icons.school_outlined,
             message: "No scholarships available",
           );
@@ -640,7 +662,7 @@ class AdminDashboardScreen extends StatelessWidget {
                 data["sponsorName"]?.toString() ??
                     "Sponsor";
 
-            return _RecentScholarshipCard(
+            return _AdminRecentScholarshipCard(
               title: title,
               amount: amount,
               sponsorName: sponsorName,
@@ -693,7 +715,7 @@ class AdminDashboardScreen extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final actions = [
-          _QuickAction(
+          _AdminQuickAction(
             icon: Icons.assignment_rounded,
             title: "Applications",
             subtitle: "Review applications",
@@ -702,13 +724,16 @@ class AdminDashboardScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const ViewApplicationsScreen(),
+                  builder: (_) =>
+                  const ViewApplicationsScreen(
+                    initialFilter: "All",
+                  ),
                 ),
               );
             },
           ),
 
-          _QuickAction(
+          _AdminQuickAction(
             icon: Icons.people_alt_rounded,
             title: "Students",
             subtitle: "Manage students",
@@ -724,7 +749,7 @@ class AdminDashboardScreen extends StatelessWidget {
             },
           ),
 
-          _QuickAction(
+          _AdminQuickAction(
             icon: Icons.business_rounded,
             title: "Sponsors",
             subtitle: "Manage sponsors",
@@ -740,7 +765,7 @@ class AdminDashboardScreen extends StatelessWidget {
             },
           ),
 
-          _QuickAction(
+          _AdminQuickAction(
             icon: Icons.analytics_rounded,
             title: "Reports",
             subtitle: "View reports",
@@ -800,14 +825,15 @@ class AdminDashboardScreen extends StatelessWidget {
 // ============================================================
 // STAT CARD
 // ============================================================
-class _StatCard extends StatelessWidget {
+
+class _AdminStatCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String value;
   final Color accent;
   final VoidCallback? onTap;
 
-  const _StatCard({
+  const _AdminStatCard({
     required this.icon,
     required this.title,
     required this.value,
@@ -846,7 +872,8 @@ class _StatCard extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   color: accent.withOpacity(.10),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius:
+                  BorderRadius.circular(14),
                 ),
                 child: Icon(
                   icon,
@@ -859,12 +886,15 @@ class _StatCard extends StatelessWidget {
 
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: AppTextStyles.subtitle.copyWith(
-                        color: AppColors.textSecondary,
+                      style:
+                      AppTextStyles.subtitle.copyWith(
+                        color:
+                        AppColors.textSecondary,
                         fontSize: 13,
                       ),
                     ),
@@ -873,7 +903,8 @@ class _StatCard extends StatelessWidget {
 
                     Text(
                       value,
-                      style: AppTextStyles.title.copyWith(
+                      style:
+                      AppTextStyles.title.copyWith(
                         fontSize: 23,
                         fontWeight: FontWeight.bold,
                       ),
@@ -893,58 +924,71 @@ class _StatCard extends StatelessWidget {
 // STATUS CARD
 // ============================================================
 
-class _StatusCard extends StatelessWidget {
+class _AdminStatusCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String value;
   final Color color;
+  final VoidCallback onTap;
 
-  const _StatusCard({
+  const _AdminStatusCard({
     required this.icon,
     required this.title,
     required this.value,
     required this.color,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: color.withOpacity(.07),
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: color.withOpacity(.16),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            color: color,
-            size: 27,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: color.withOpacity(.07),
+            borderRadius:
+            BorderRadius.circular(18),
+            border: Border.all(
+              color: color.withOpacity(.16),
+            ),
           ),
-
-          const SizedBox(width: 14),
-
-          Expanded(
-            child: Text(
-              title,
-              style: AppTextStyles.subtitle.copyWith(
-                fontWeight: FontWeight.w600,
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: color,
+                size: 27,
               ),
-            ),
-          ),
 
-          Text(
-            value,
-            style: AppTextStyles.title.copyWith(
-              fontSize: 22,
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
+              const SizedBox(width: 14),
+
+              Expanded(
+                child: Text(
+                  title,
+                  style:
+                  AppTextStyles.subtitle.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+
+              Text(
+                value,
+                style:
+                AppTextStyles.title.copyWith(
+                  fontSize: 22,
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -954,12 +998,13 @@ class _StatusCard extends StatelessWidget {
 // RECENT APPLICATION CARD
 // ============================================================
 
-class _RecentApplicationCard extends StatelessWidget {
+class _AdminRecentApplicationCard
+    extends StatelessWidget {
   final String studentName;
   final String scholarshipTitle;
   final String status;
 
-  const _RecentApplicationCard({
+  const _AdminRecentApplicationCard({
     required this.studentName,
     required this.scholarshipTitle,
     required this.status,
@@ -983,11 +1028,13 @@ class _RecentApplicationCard extends StatelessWidget {
     final color = _statusColor();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin:
+      const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius:
+        BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(.035),
@@ -1044,7 +1091,8 @@ class _RecentApplicationCard extends StatelessWidget {
           ),
 
           Container(
-            padding: const EdgeInsets.symmetric(
+            padding:
+            const EdgeInsets.symmetric(
               horizontal: 10,
               vertical: 6,
             ),
@@ -1072,13 +1120,13 @@ class _RecentApplicationCard extends StatelessWidget {
 // RECENT SCHOLARSHIP CARD
 // ============================================================
 
-class _RecentScholarshipCard
+class _AdminRecentScholarshipCard
     extends StatelessWidget {
   final String title;
   final String amount;
   final String sponsorName;
 
-  const _RecentScholarshipCard({
+  const _AdminRecentScholarshipCard({
     required this.title,
     required this.amount,
     required this.sponsorName,
@@ -1087,11 +1135,13 @@ class _RecentScholarshipCard
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin:
+      const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius:
+        BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(.035),
@@ -1148,7 +1198,8 @@ class _RecentScholarshipCard
 
           Text(
             "₹$amount",
-            style: AppTextStyles.title.copyWith(
+            style:
+            AppTextStyles.title.copyWith(
               fontSize: 15,
               color: AppColors.primary,
               fontWeight: FontWeight.bold,
@@ -1164,14 +1215,15 @@ class _RecentScholarshipCard
 // QUICK ACTION
 // ============================================================
 
-class _QuickAction extends StatelessWidget {
+class _AdminQuickAction
+    extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
 
-  const _QuickAction({
+  const _AdminQuickAction({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -1184,13 +1236,15 @@ class _QuickAction extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius:
+        BorderRadius.circular(18),
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius:
+            BorderRadius.circular(18),
             border: Border.all(
               color: color.withOpacity(.15),
             ),
@@ -1252,11 +1306,12 @@ class _QuickAction extends StatelessWidget {
 // EMPTY CARD
 // ============================================================
 
-class _EmptyCard extends StatelessWidget {
+class _AdminEmptyCard
+    extends StatelessWidget {
   final IconData icon;
   final String message;
 
-  const _EmptyCard({
+  const _AdminEmptyCard({
     required this.icon,
     required this.message,
   });
@@ -1265,12 +1320,14 @@ class _EmptyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
+      padding:
+      const EdgeInsets.symmetric(
         vertical: 30,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius:
+        BorderRadius.circular(18),
       ),
       child: Column(
         children: [
@@ -1284,8 +1341,10 @@ class _EmptyCard extends StatelessWidget {
 
           Text(
             message,
-            style: AppTextStyles.subtitle.copyWith(
-              color: AppColors.textSecondary,
+            style:
+            AppTextStyles.subtitle.copyWith(
+              color:
+              AppColors.textSecondary,
             ),
           ),
         ],
@@ -1298,8 +1357,9 @@ class _EmptyCard extends StatelessWidget {
 // LOADING CARD
 // ============================================================
 
-class _LoadingCard extends StatelessWidget {
-  const _LoadingCard();
+class _AdminLoadingCard
+    extends StatelessWidget {
+  const _AdminLoadingCard();
 
   @override
   Widget build(BuildContext context) {
@@ -1308,7 +1368,8 @@ class _LoadingCard extends StatelessWidget {
       height: 90,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius:
+        BorderRadius.circular(18),
       ),
       child: const Center(
         child: CircularProgressIndicator(),
