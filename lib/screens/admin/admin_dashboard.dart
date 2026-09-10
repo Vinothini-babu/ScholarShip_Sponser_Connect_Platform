@@ -19,24 +19,33 @@ class AdminDashboardScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 40),
+          padding: const EdgeInsets.only(
+            bottom: 40,
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
             children: [
               _buildHeader(),
 
               const SizedBox(height: 28),
 
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding:
+                const EdgeInsets.symmetric(
+                  horizontal: 24,
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
                   children: [
                     Text(
                       "Admin Control Center",
-                      style: AppTextStyles.title.copyWith(
+                      style:
+                      AppTextStyles.title.copyWith(
                         fontSize: 24,
-                        fontWeight: FontWeight.bold,
+                        fontWeight:
+                        FontWeight.bold,
                       ),
                     ),
 
@@ -44,28 +53,23 @@ class AdminDashboardScreen extends StatelessWidget {
 
                     Text(
                       "Monitor and manage the scholarship platform",
-                      style: AppTextStyles.subtitle.copyWith(
-                        color: AppColors.textSecondary,
+                      style: AppTextStyles.subtitle
+                          .copyWith(
+                        color:
+                        AppColors.textSecondary,
                       ),
                     ),
 
                     const SizedBox(height: 24),
 
-                    // ==========================================
-                    // STATISTICS
-                    // ==========================================
-
                     _buildStatistics(),
 
                     const SizedBox(height: 30),
 
-                    // ==========================================
-                    // APPLICATION STATUS
-                    // ==========================================
-
                     Text(
                       "Application Status",
-                      style: AppTextStyles.title.copyWith(
+                      style:
+                      AppTextStyles.title.copyWith(
                         fontSize: 20,
                       ),
                     ),
@@ -76,21 +80,16 @@ class AdminDashboardScreen extends StatelessWidget {
 
                     const SizedBox(height: 30),
 
-                    // ==========================================
-                    // RECENT APPLICATIONS
-                    // ==========================================
-
                     _buildSectionHeader(
-                      title: "Recent Applications",
+                      title:
+                      "Recent Applications",
                       buttonText: "View All",
                       onPressed: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) =>
-                            const ViewApplicationsScreen(
-                              initialFilter: "All",
-                            ),
+                            const ViewApplicationsScreen(),
                           ),
                         );
                       },
@@ -102,12 +101,9 @@ class AdminDashboardScreen extends StatelessWidget {
 
                     const SizedBox(height: 30),
 
-                    // ==========================================
-                    // RECENT SCHOLARSHIPS
-                    // ==========================================
-
                     _buildSectionHeader(
-                      title: "Recent Scholarships",
+                      title:
+                      "Recent Scholarships",
                       buttonText: "Manage",
                       onPressed: () {
                         Navigator.push(
@@ -126,13 +122,10 @@ class AdminDashboardScreen extends StatelessWidget {
 
                     const SizedBox(height: 30),
 
-                    // ==========================================
-                    // QUICK ACTIONS
-                    // ==========================================
-
                     Text(
                       "Quick Actions",
-                      style: AppTextStyles.title.copyWith(
+                      style:
+                      AppTextStyles.title.copyWith(
                         fontSize: 20,
                       ),
                     ),
@@ -170,7 +163,8 @@ class AdminDashboardScreen extends StatelessWidget {
             AppColors.primary.withOpacity(.82),
           ],
         ),
-        borderRadius: const BorderRadius.only(
+        borderRadius:
+        const BorderRadius.only(
           bottomLeft: Radius.circular(32),
           bottomRight: Radius.circular(32),
         ),
@@ -181,7 +175,8 @@ class AdminDashboardScreen extends StatelessWidget {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.15),
+              color:
+              Colors.white.withOpacity(.15),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -200,8 +195,10 @@ class AdminDashboardScreen extends StatelessWidget {
               children: [
                 Text(
                   "Welcome Admin 👋",
-                  style: AppTextStyles.subtitle.copyWith(
-                    color: Colors.white.withOpacity(.9),
+                  style:
+                  AppTextStyles.subtitle.copyWith(
+                    color: Colors.white
+                        .withOpacity(.9),
                     fontSize: 14,
                   ),
                 ),
@@ -210,10 +207,12 @@ class AdminDashboardScreen extends StatelessWidget {
 
                 Text(
                   "Scholarship Sponsor Connect",
-                  style: AppTextStyles.title.copyWith(
+                  style:
+                  AppTextStyles.title.copyWith(
                     color: Colors.white,
                     fontSize: 22,
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                    FontWeight.bold,
                   ),
                 ),
               ],
@@ -224,7 +223,8 @@ class AdminDashboardScreen extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.14),
+              color:
+              Colors.white.withOpacity(.14),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -254,38 +254,61 @@ class AdminDashboardScreen extends StatelessWidget {
           stream: FirebaseFirestore.instance
               .collection("scholarships")
               .snapshots(),
-          builder: (context, scholarshipSnapshot) {
+          builder:
+              (context, scholarshipSnapshot) {
             final scholarshipCount =
-                scholarshipSnapshot.data?.docs.length ?? 0;
+                scholarshipSnapshot
+                    .data
+                    ?.docs
+                    .length ??
+                    0;
 
             return StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection("applications")
                   .snapshots(),
-              builder: (context, applicationSnapshot) {
+              builder:
+                  (context, applicationSnapshot) {
                 final applicationCount =
-                    applicationSnapshot.data?.docs.length ?? 0;
+                    applicationSnapshot
+                        .data
+                        ?.docs
+                        .length ??
+                        0;
 
                 return StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
+                  stream: FirebaseFirestore
+                      .instance
                       .collection("users")
                       .where(
                     "role",
                     isEqualTo: "sponsor",
                   )
                       .snapshots(),
-                  builder: (context, sponsorSnapshot) {
+                  builder:
+                      (context, sponsorSnapshot) {
                     final sponsorCount =
-                        sponsorSnapshot.data?.docs.length ?? 0;
+                        sponsorSnapshot
+                            .data
+                            ?.docs
+                            .length ??
+                            0;
 
                     return LayoutBuilder(
-                      builder: (context, constraints) {
+                      builder: (
+                          context,
+                          constraints,
+                          ) {
                         final cards = [
                           _AdminStatCard(
-                            icon: Icons.people_alt_rounded,
-                            title: "Total Users",
-                            value: "$usersCount",
-                            accent: Colors.blue,
+                            icon:
+                            Icons.people_alt_rounded,
+                            title:
+                            "Total Users",
+                            value:
+                            "$usersCount",
+                            accent:
+                            Colors.blue,
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -298,10 +321,14 @@ class AdminDashboardScreen extends StatelessWidget {
                           ),
 
                           _AdminStatCard(
-                            icon: Icons.school_rounded,
-                            title: "Scholarships",
-                            value: "$scholarshipCount",
-                            accent: Colors.orange,
+                            icon:
+                            Icons.school_rounded,
+                            title:
+                            "Scholarships",
+                            value:
+                            "$scholarshipCount",
+                            accent:
+                            Colors.orange,
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -314,28 +341,34 @@ class AdminDashboardScreen extends StatelessWidget {
                           ),
 
                           _AdminStatCard(
-                            icon: Icons.assignment_rounded,
-                            title: "Applications",
-                            value: "$applicationCount",
-                            accent: Colors.green,
+                            icon:
+                            Icons.assignment_rounded,
+                            title:
+                            "Applications",
+                            value:
+                            "$applicationCount",
+                            accent:
+                            Colors.green,
                             onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) =>
-                                  const ViewApplicationsScreen(
-                                    initialFilter: "All",
-                                  ),
+                                  const ViewApplicationsScreen(),
                                 ),
                               );
                             },
                           ),
 
                           _AdminStatCard(
-                            icon: Icons.business_rounded,
-                            title: "Sponsors",
-                            value: "$sponsorCount",
-                            accent: Colors.purple,
+                            icon:
+                            Icons.business_rounded,
+                            title:
+                            "Sponsors",
+                            value:
+                            "$sponsorCount",
+                            accent:
+                            Colors.purple,
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -348,16 +381,25 @@ class AdminDashboardScreen extends StatelessWidget {
                           ),
                         ];
 
-                        if (constraints.maxWidth > 800) {
+                        if (constraints
+                            .maxWidth >
+                            800) {
                           return Row(
                             children: [
-                              Expanded(child: cards[0]),
-                              const SizedBox(width: 14),
-                              Expanded(child: cards[1]),
-                              const SizedBox(width: 14),
-                              Expanded(child: cards[2]),
-                              const SizedBox(width: 14),
-                              Expanded(child: cards[3]),
+                              for (int i = 0;
+                              i < cards.length;
+                              i++) ...[
+                                Expanded(
+                                  child:
+                                  cards[i],
+                                ),
+                                if (i !=
+                                    cards.length -
+                                        1)
+                                  const SizedBox(
+                                    width: 14,
+                                  ),
+                              ],
                             ],
                           );
                         }
@@ -366,19 +408,37 @@ class AdminDashboardScreen extends StatelessWidget {
                           children: [
                             Row(
                               children: [
-                                Expanded(child: cards[0]),
-                                const SizedBox(width: 12),
-                                Expanded(child: cards[1]),
+                                Expanded(
+                                  child:
+                                  cards[0],
+                                ),
+                                const SizedBox(
+                                  width: 12,
+                                ),
+                                Expanded(
+                                  child:
+                                  cards[1],
+                                ),
                               ],
                             ),
 
-                            const SizedBox(height: 12),
+                            const SizedBox(
+                              height: 12,
+                            ),
 
                             Row(
                               children: [
-                                Expanded(child: cards[2]),
-                                const SizedBox(width: 12),
-                                Expanded(child: cards[3]),
+                                Expanded(
+                                  child:
+                                  cards[2],
+                                ),
+                                const SizedBox(
+                                  width: 12,
+                                ),
+                                Expanded(
+                                  child:
+                                  cards[3],
+                                ),
                               ],
                             ),
                           ],
@@ -405,7 +465,8 @@ class AdminDashboardScreen extends StatelessWidget {
           .collection("applications")
           .snapshots(),
       builder: (context, snapshot) {
-        final docs = snapshot.data?.docs ?? [];
+        final docs =
+            snapshot.data?.docs ?? [];
 
         int pending = 0;
         int approved = 0;
@@ -413,99 +474,122 @@ class AdminDashboardScreen extends StatelessWidget {
 
         for (final doc in docs) {
           final data =
-          doc.data() as Map<String, dynamic>;
+          doc.data()
+          as Map<String, dynamic>;
 
           final status =
-              data["status"]?.toString().toLowerCase() ??
+              data["status"]
+                  ?.toString()
+                  .trim()
+                  .toLowerCase() ??
                   "pending";
 
           if (status == "approved") {
             approved++;
-          } else if (status == "rejected") {
+          } else if (status == "rejected" ||
+              status == "reject") {
             rejected++;
           } else {
             pending++;
           }
         }
 
-        final cards = [
-          // ==========================================
-          // PENDING
-          // ==========================================
-
-          _AdminStatusCard(
-            icon: Icons.hourglass_top_rounded,
-            title: "Pending",
-            value: "$pending",
-            color: Colors.orange,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                  const ViewApplicationsScreen(
-                    initialFilter: "Pending",
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // ==========================================
-          // APPROVED
-          // ==========================================
-
-          _AdminStatusCard(
-            icon: Icons.check_circle_rounded,
-            title: "Approved",
-            value: "$approved",
-            color: Colors.green,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                  const ViewApplicationsScreen(
-                    initialFilter: "Approved",
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // ==========================================
-          // REJECTED
-          // ==========================================
-
-          _AdminStatusCard(
-            icon: Icons.cancel_rounded,
-            title: "Rejected",
-            value: "$rejected",
-            color: Colors.red,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                  const ViewApplicationsScreen(
-                    initialFilter: "Rejected",
-                  ),
-                ),
-              );
-            },
-          ),
-        ];
-
         return LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth > 700) {
+          builder:
+              (context, constraints) {
+            final cards = [
+              // =================================================
+              // PENDING
+              // =================================================
+
+              _AdminStatusCard(
+                icon:
+                Icons.hourglass_top_rounded,
+                title: "Pending",
+                value: "$pending",
+                color: Colors.orange,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                      const ViewApplicationsScreen(
+                        initialFilter:
+                        "Pending",
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              // =================================================
+              // APPROVED
+              // =================================================
+
+              _AdminStatusCard(
+                icon:
+                Icons.check_circle_rounded,
+                title: "Approved",
+                value: "$approved",
+                color: Colors.green,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                      const ViewApplicationsScreen(
+                        initialFilter:
+                        "Approved",
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              // =================================================
+              // REJECTED
+              // =================================================
+
+              _AdminStatusCard(
+                icon:
+                Icons.cancel_rounded,
+                title: "Rejected",
+                value: "$rejected",
+                color: Colors.red,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                      const ViewApplicationsScreen(
+                        initialFilter:
+                        "Rejected",
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ];
+
+            if (constraints.maxWidth >
+                700) {
               return Row(
                 children: [
-                  Expanded(child: cards[0]),
-                  const SizedBox(width: 14),
-                  Expanded(child: cards[1]),
-                  const SizedBox(width: 14),
-                  Expanded(child: cards[2]),
+                  Expanded(
+                    child: cards[0],
+                  ),
+                  const SizedBox(
+                    width: 14,
+                  ),
+                  Expanded(
+                    child: cards[1],
+                  ),
+                  const SizedBox(
+                    width: 14,
+                  ),
+                  Expanded(
+                    child: cards[2],
+                  ),
                 ],
               );
             }
@@ -513,9 +597,13 @@ class AdminDashboardScreen extends StatelessWidget {
             return Column(
               children: [
                 cards[0],
-                const SizedBox(height: 10),
+                const SizedBox(
+                  height: 10,
+                ),
                 cards[1],
-                const SizedBox(height: 10),
+                const SizedBox(
+                  height: 10,
+                ),
                 cards[2],
               ],
             );
@@ -540,18 +628,23 @@ class AdminDashboardScreen extends StatelessWidget {
           return const _AdminLoadingCard();
         }
 
-        final docs = [
-          ...?snapshot.data?.docs,
-        ];
+        final docs =
+        [...?snapshot.data?.docs];
 
         docs.sort((a, b) {
           final aData =
-          a.data() as Map<String, dynamic>;
-          final bData =
-          b.data() as Map<String, dynamic>;
+          a.data()
+          as Map<String, dynamic>;
 
-          final aDate = aData["appliedAt"];
-          final bDate = bData["appliedAt"];
+          final bData =
+          b.data()
+          as Map<String, dynamic>;
+
+          final aDate =
+          aData["appliedAt"];
+
+          final bDate =
+          bData["appliedAt"];
 
           if (aDate is Timestamp &&
               bDate is Timestamp) {
@@ -566,31 +659,40 @@ class AdminDashboardScreen extends StatelessWidget {
 
         if (recentDocs.isEmpty) {
           return const _AdminEmptyCard(
-            icon: Icons.assignment_outlined,
-            message: "No applications yet",
+            icon:
+            Icons.assignment_outlined,
+            message:
+            "No applications yet",
           );
         }
 
         return Column(
-          children: recentDocs.map((doc) {
+          children:
+          recentDocs.map((doc) {
             final data =
-            doc.data() as Map<String, dynamic>;
+            doc.data()
+            as Map<String, dynamic>;
 
             final studentName =
-                data["studentName"]?.toString() ??
+                data["studentName"]
+                    ?.toString() ??
                     "Unknown Student";
 
             final scholarshipTitle =
-                data["scholarshipTitle"]?.toString() ??
+                data["scholarshipTitle"]
+                    ?.toString() ??
                     "Scholarship";
 
             final status =
-                data["status"]?.toString() ??
+                data["status"]
+                    ?.toString() ??
                     "Pending";
 
             return _AdminRecentApplicationCard(
-              studentName: studentName,
-              scholarshipTitle: scholarshipTitle,
+              studentName:
+              studentName,
+              scholarshipTitle:
+              scholarshipTitle,
               status: status,
             );
           }).toList(),
@@ -614,18 +716,23 @@ class AdminDashboardScreen extends StatelessWidget {
           return const _AdminLoadingCard();
         }
 
-        final docs = [
-          ...?snapshot.data?.docs,
-        ];
+        final docs =
+        [...?snapshot.data?.docs];
 
         docs.sort((a, b) {
           final aData =
-          a.data() as Map<String, dynamic>;
-          final bData =
-          b.data() as Map<String, dynamic>;
+          a.data()
+          as Map<String, dynamic>;
 
-          final aDate = aData["createdAt"];
-          final bDate = bData["createdAt"];
+          final bData =
+          b.data()
+          as Map<String, dynamic>;
+
+          final aDate =
+          aData["createdAt"];
+
+          final bDate =
+          bData["createdAt"];
 
           if (aDate is Timestamp &&
               bDate is Timestamp) {
@@ -640,32 +747,42 @@ class AdminDashboardScreen extends StatelessWidget {
 
         if (recentDocs.isEmpty) {
           return const _AdminEmptyCard(
-            icon: Icons.school_outlined,
-            message: "No scholarships available",
+            icon:
+            Icons.school_outlined,
+            message:
+            "No scholarships available",
           );
         }
 
         return Column(
-          children: recentDocs.map((doc) {
+          children:
+          recentDocs.map((doc) {
             final data =
-            doc.data() as Map<String, dynamic>;
+            doc.data()
+            as Map<String, dynamic>;
 
             final title =
-                data["title"]?.toString() ??
-                    data["scholarshipTitle"]?.toString() ??
+                data["title"]
+                    ?.toString() ??
+                    data["scholarshipTitle"]
+                        ?.toString() ??
                     "Scholarship";
 
             final amount =
-                data["amount"]?.toString() ?? "0";
+                data["amount"]
+                    ?.toString() ??
+                    "0";
 
             final sponsorName =
-                data["sponsorName"]?.toString() ??
+                data["sponsorName"]
+                    ?.toString() ??
                     "Sponsor";
 
             return _AdminRecentScholarshipCard(
               title: title,
               amount: amount,
-              sponsorName: sponsorName,
+              sponsorName:
+              sponsorName,
             );
           }).toList(),
         );
@@ -687,7 +804,8 @@ class AdminDashboardScreen extends StatelessWidget {
         Expanded(
           child: Text(
             title,
-            style: AppTextStyles.title.copyWith(
+            style:
+            AppTextStyles.title.copyWith(
               fontSize: 20,
             ),
           ),
@@ -698,8 +816,10 @@ class AdminDashboardScreen extends StatelessWidget {
           child: Text(
             buttonText,
             style: TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
+              color:
+              AppColors.primary,
+              fontWeight:
+              FontWeight.bold,
             ),
           ),
         ),
@@ -711,33 +831,42 @@ class AdminDashboardScreen extends StatelessWidget {
   // QUICK ACTIONS
   // ============================================================
 
-  Widget _buildQuickActions(BuildContext context) {
+  Widget _buildQuickActions(
+      BuildContext context,
+      ) {
     return LayoutBuilder(
-      builder: (context, constraints) {
+      builder:
+          (context, constraints) {
         final actions = [
           _AdminQuickAction(
-            icon: Icons.assignment_rounded,
-            title: "Applications",
-            subtitle: "Review applications",
-            color: Colors.green,
+            icon:
+            Icons.assignment_rounded,
+            title:
+            "Applications",
+            subtitle:
+            "Review applications",
+            color:
+            Colors.green,
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) =>
-                  const ViewApplicationsScreen(
-                    initialFilter: "All",
-                  ),
+                  const ViewApplicationsScreen(),
                 ),
               );
             },
           ),
 
           _AdminQuickAction(
-            icon: Icons.people_alt_rounded,
-            title: "Students",
-            subtitle: "Manage students",
-            color: Colors.blue,
+            icon:
+            Icons.people_alt_rounded,
+            title:
+            "Students",
+            subtitle:
+            "Manage students",
+            color:
+            Colors.blue,
             onTap: () {
               Navigator.push(
                 context,
@@ -750,10 +879,14 @@ class AdminDashboardScreen extends StatelessWidget {
           ),
 
           _AdminQuickAction(
-            icon: Icons.business_rounded,
-            title: "Sponsors",
-            subtitle: "Manage sponsors",
-            color: Colors.purple,
+            icon:
+            Icons.business_rounded,
+            title:
+            "Sponsors",
+            subtitle:
+            "Manage sponsors",
+            color:
+            Colors.purple,
             onTap: () {
               Navigator.push(
                 context,
@@ -766,10 +899,14 @@ class AdminDashboardScreen extends StatelessWidget {
           ),
 
           _AdminQuickAction(
-            icon: Icons.analytics_rounded,
-            title: "Reports",
-            subtitle: "View reports",
-            color: Colors.deepPurple,
+            icon:
+            Icons.analytics_rounded,
+            title:
+            "Reports",
+            subtitle:
+            "View reports",
+            color:
+            Colors.deepPurple,
             onTap: () {
               Navigator.push(
                 context,
@@ -782,16 +919,31 @@ class AdminDashboardScreen extends StatelessWidget {
           ),
         ];
 
-        if (constraints.maxWidth > 750) {
+        if (constraints.maxWidth >
+            750) {
           return Row(
             children: [
-              Expanded(child: actions[0]),
-              const SizedBox(width: 12),
-              Expanded(child: actions[1]),
-              const SizedBox(width: 12),
-              Expanded(child: actions[2]),
-              const SizedBox(width: 12),
-              Expanded(child: actions[3]),
+              Expanded(
+                child: actions[0],
+              ),
+              const SizedBox(
+                width: 12,
+              ),
+              Expanded(
+                child: actions[1],
+              ),
+              const SizedBox(
+                width: 12,
+              ),
+              Expanded(
+                child: actions[2],
+              ),
+              const SizedBox(
+                width: 12,
+              ),
+              Expanded(
+                child: actions[3],
+              ),
             ],
           );
         }
@@ -800,19 +952,33 @@ class AdminDashboardScreen extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(child: actions[0]),
-                const SizedBox(width: 12),
-                Expanded(child: actions[1]),
+                Expanded(
+                  child: actions[0],
+                ),
+                const SizedBox(
+                  width: 12,
+                ),
+                Expanded(
+                  child: actions[1],
+                ),
               ],
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(
+              height: 12,
+            ),
 
             Row(
               children: [
-                Expanded(child: actions[2]),
-                const SizedBox(width: 12),
-                Expanded(child: actions[3]),
+                Expanded(
+                  child: actions[2],
+                ),
+                const SizedBox(
+                  width: 12,
+                ),
+                Expanded(
+                  child: actions[3],
+                ),
               ],
             ),
           ],
@@ -822,11 +988,12 @@ class AdminDashboardScreen extends StatelessWidget {
   }
 }
 
-// ============================================================
+// ================================================================
 // STAT CARD
-// ============================================================
+// ================================================================
 
-class _AdminStatCard extends StatelessWidget {
+class _AdminStatCard
+    extends StatelessWidget {
   final IconData icon;
   final String title;
   final String value;
@@ -842,26 +1009,35 @@ class _AdminStatCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context) {
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius:
+      BorderRadius.circular(18),
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius:
+        BorderRadius.circular(18),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
+          padding:
+          const EdgeInsets.all(18),
+          decoration:
+          BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius:
+            BorderRadius.circular(18),
             border: Border.all(
-              color: accent.withOpacity(.15),
+              color:
+              accent.withOpacity(.15),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(.04),
+                color: Colors.black
+                    .withOpacity(.04),
                 blurRadius: 12,
-                offset: const Offset(0, 5),
+                offset:
+                const Offset(0, 5),
               ),
             ],
           ),
@@ -870,10 +1046,14 @@ class _AdminStatCard extends StatelessWidget {
               Container(
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(
-                  color: accent.withOpacity(.10),
+                decoration:
+                BoxDecoration(
+                  color: accent
+                      .withOpacity(.10),
                   borderRadius:
-                  BorderRadius.circular(14),
+                  BorderRadius.circular(
+                    14,
+                  ),
                 ),
                 child: Icon(
                   icon,
@@ -882,31 +1062,39 @@ class _AdminStatCard extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(width: 14),
+              const SizedBox(
+                width: 14,
+              ),
 
               Expanded(
                 child: Column(
                   crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  CrossAxisAlignment
+                      .start,
                   children: [
                     Text(
                       title,
-                      style:
-                      AppTextStyles.subtitle.copyWith(
-                        color:
-                        AppColors.textSecondary,
+                      style: AppTextStyles
+                          .subtitle
+                          .copyWith(
+                        color: AppColors
+                            .textSecondary,
                         fontSize: 13,
                       ),
                     ),
 
-                    const SizedBox(height: 4),
+                    const SizedBox(
+                      height: 4,
+                    ),
 
                     Text(
                       value,
-                      style:
-                      AppTextStyles.title.copyWith(
+                      style: AppTextStyles
+                          .title
+                          .copyWith(
                         fontSize: 23,
-                        fontWeight: FontWeight.bold,
+                        fontWeight:
+                        FontWeight.bold,
                       ),
                     ),
                   ],
@@ -920,11 +1108,12 @@ class _AdminStatCard extends StatelessWidget {
   }
 }
 
-// ============================================================
+// ================================================================
 // STATUS CARD
-// ============================================================
+// ================================================================
 
-class _AdminStatusCard extends StatelessWidget {
+class _AdminStatusCard
+    extends StatelessWidget {
   final IconData icon;
   final String title;
   final String value;
@@ -940,21 +1129,28 @@ class _AdminStatusCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context) {
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius:
+      BorderRadius.circular(18),
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius:
+        BorderRadius.circular(18),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: color.withOpacity(.07),
+          padding:
+          const EdgeInsets.all(18),
+          decoration:
+          BoxDecoration(
+            color:
+            color.withOpacity(.07),
             borderRadius:
             BorderRadius.circular(18),
             border: Border.all(
-              color: color.withOpacity(.16),
+              color:
+              color.withOpacity(.16),
             ),
           ),
           child: Row(
@@ -965,25 +1161,31 @@ class _AdminStatusCard extends StatelessWidget {
                 size: 27,
               ),
 
-              const SizedBox(width: 14),
+              const SizedBox(
+                width: 14,
+              ),
 
               Expanded(
                 child: Text(
                   title,
-                  style:
-                  AppTextStyles.subtitle.copyWith(
-                    fontWeight: FontWeight.w600,
+                  style: AppTextStyles
+                      .subtitle
+                      .copyWith(
+                    fontWeight:
+                    FontWeight.w600,
                   ),
                 ),
               ),
 
               Text(
                 value,
-                style:
-                AppTextStyles.title.copyWith(
+                style: AppTextStyles
+                    .title
+                    .copyWith(
                   fontSize: 22,
                   color: color,
-                  fontWeight: FontWeight.bold,
+                  fontWeight:
+                  FontWeight.bold,
                 ),
               ),
             ],
@@ -994,9 +1196,9 @@ class _AdminStatusCard extends StatelessWidget {
   }
 }
 
-// ============================================================
+// ================================================================
 // RECENT APPLICATION CARD
-// ============================================================
+// ================================================================
 
 class _AdminRecentApplicationCard
     extends StatelessWidget {
@@ -1024,22 +1226,30 @@ class _AdminRecentApplicationCard
   }
 
   @override
-  Widget build(BuildContext context) {
-    final color = _statusColor();
+  Widget build(
+      BuildContext context) {
+    final color =
+    _statusColor();
 
     return Container(
       margin:
-      const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      const EdgeInsets.only(
+        bottom: 10,
+      ),
+      padding:
+      const EdgeInsets.all(16),
+      decoration:
+      BoxDecoration(
         color: Colors.white,
         borderRadius:
         BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(.035),
+            color: Colors.black
+                .withOpacity(.035),
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset:
+            const Offset(0, 4),
           ),
         ],
       ),
@@ -1048,19 +1258,25 @@ class _AdminRecentApplicationCard
           CircleAvatar(
             radius: 22,
             backgroundColor:
-            AppColors.primary.withOpacity(.10),
+            AppColors.primary
+                .withOpacity(.10),
             child: Text(
               studentName.isNotEmpty
-                  ? studentName[0].toUpperCase()
+                  ? studentName[0]
+                  .toUpperCase()
                   : "?",
               style: TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
+                color:
+                AppColors.primary,
+                fontWeight:
+                FontWeight.bold,
               ),
             ),
           ),
 
-          const SizedBox(width: 14),
+          const SizedBox(
+            width: 14,
+          ),
 
           Expanded(
             child: Column(
@@ -1069,21 +1285,26 @@ class _AdminRecentApplicationCard
               children: [
                 Text(
                   studentName,
-                  style:
-                  AppTextStyles.subtitle.copyWith(
-                    fontWeight: FontWeight.bold,
+                  style: AppTextStyles
+                      .subtitle
+                      .copyWith(
+                    fontWeight:
+                    FontWeight.bold,
                   ),
                 ),
 
-                const SizedBox(height: 4),
+                const SizedBox(
+                  height: 4,
+                ),
 
                 Text(
                   scholarshipTitle,
-                  style:
-                  AppTextStyles.subtitle.copyWith(
+                  style: AppTextStyles
+                      .subtitle
+                      .copyWith(
                     fontSize: 12,
-                    color:
-                    AppColors.textSecondary,
+                    color: AppColors
+                        .textSecondary,
                   ),
                 ),
               ],
@@ -1096,17 +1317,22 @@ class _AdminRecentApplicationCard
               horizontal: 10,
               vertical: 6,
             ),
-            decoration: BoxDecoration(
-              color: color.withOpacity(.10),
+            decoration:
+            BoxDecoration(
+              color: color
+                  .withOpacity(.10),
               borderRadius:
-              BorderRadius.circular(20),
+              BorderRadius.circular(
+                20,
+              ),
             ),
             child: Text(
               status,
               style: TextStyle(
                 color: color,
                 fontSize: 12,
-                fontWeight: FontWeight.bold,
+                fontWeight:
+                FontWeight.bold,
               ),
             ),
           ),
@@ -1116,9 +1342,9 @@ class _AdminRecentApplicationCard
   }
 }
 
-// ============================================================
+// ================================================================
 // RECENT SCHOLARSHIP CARD
-// ============================================================
+// ================================================================
 
 class _AdminRecentScholarshipCard
     extends StatelessWidget {
@@ -1133,20 +1359,27 @@ class _AdminRecentScholarshipCard
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context) {
     return Container(
       margin:
-      const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      const EdgeInsets.only(
+        bottom: 10,
+      ),
+      padding:
+      const EdgeInsets.all(16),
+      decoration:
+      BoxDecoration(
         color: Colors.white,
         borderRadius:
         BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(.035),
+            color: Colors.black
+                .withOpacity(.035),
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset:
+            const Offset(0, 4),
           ),
         ],
       ),
@@ -1155,18 +1388,25 @@ class _AdminRecentScholarshipCard
           Container(
             width: 44,
             height: 44,
-            decoration: BoxDecoration(
-              color: Colors.orange.withOpacity(.10),
+            decoration:
+            BoxDecoration(
+              color: Colors.orange
+                  .withOpacity(.10),
               borderRadius:
-              BorderRadius.circular(13),
+              BorderRadius.circular(
+                13,
+              ),
             ),
             child: const Icon(
               Icons.school_rounded,
-              color: Colors.orange,
+              color:
+              Colors.orange,
             ),
           ),
 
-          const SizedBox(width: 14),
+          const SizedBox(
+            width: 14,
+          ),
 
           Expanded(
             child: Column(
@@ -1175,21 +1415,26 @@ class _AdminRecentScholarshipCard
               children: [
                 Text(
                   title,
-                  style:
-                  AppTextStyles.subtitle.copyWith(
-                    fontWeight: FontWeight.bold,
+                  style: AppTextStyles
+                      .subtitle
+                      .copyWith(
+                    fontWeight:
+                    FontWeight.bold,
                   ),
                 ),
 
-                const SizedBox(height: 4),
+                const SizedBox(
+                  height: 4,
+                ),
 
                 Text(
                   sponsorName,
-                  style:
-                  AppTextStyles.subtitle.copyWith(
+                  style: AppTextStyles
+                      .subtitle
+                      .copyWith(
                     fontSize: 12,
-                    color:
-                    AppColors.textSecondary,
+                    color: AppColors
+                        .textSecondary,
                   ),
                 ),
               ],
@@ -1198,11 +1443,14 @@ class _AdminRecentScholarshipCard
 
           Text(
             "₹$amount",
-            style:
-            AppTextStyles.title.copyWith(
+            style: AppTextStyles
+                .title
+                .copyWith(
               fontSize: 15,
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
+              color:
+              AppColors.primary,
+              fontWeight:
+              FontWeight.bold,
             ),
           ),
         ],
@@ -1211,9 +1459,9 @@ class _AdminRecentScholarshipCard
   }
 }
 
-// ============================================================
+// ================================================================
 // QUICK ACTION
-// ============================================================
+// ================================================================
 
 class _AdminQuickAction
     extends StatelessWidget {
@@ -1232,7 +1480,8 @@ class _AdminQuickAction
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1240,13 +1489,16 @@ class _AdminQuickAction
         BorderRadius.circular(18),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
+          padding:
+          const EdgeInsets.all(16),
+          decoration:
+          BoxDecoration(
             color: Colors.white,
             borderRadius:
             BorderRadius.circular(18),
             border: Border.all(
-              color: color.withOpacity(.15),
+              color:
+              color.withOpacity(.15),
             ),
           ),
           child: Row(
@@ -1254,10 +1506,14 @@ class _AdminQuickAction
               Container(
                 width: 44,
                 height: 44,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(.10),
+                decoration:
+                BoxDecoration(
+                  color: color
+                      .withOpacity(.10),
                   borderRadius:
-                  BorderRadius.circular(13),
+                  BorderRadius.circular(
+                    13,
+                  ),
                 ),
                 child: Icon(
                   icon,
@@ -1265,30 +1521,38 @@ class _AdminQuickAction
                 ),
               ),
 
-              const SizedBox(width: 12),
+              const SizedBox(
+                width: 12,
+              ),
 
               Expanded(
                 child: Column(
                   crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  CrossAxisAlignment
+                      .start,
                   children: [
                     Text(
                       title,
-                      style:
-                      AppTextStyles.subtitle.copyWith(
-                        fontWeight: FontWeight.bold,
+                      style: AppTextStyles
+                          .subtitle
+                          .copyWith(
+                        fontWeight:
+                        FontWeight.bold,
                       ),
                     ),
 
-                    const SizedBox(height: 3),
+                    const SizedBox(
+                      height: 3,
+                    ),
 
                     Text(
                       subtitle,
-                      style:
-                      AppTextStyles.subtitle.copyWith(
+                      style: AppTextStyles
+                          .subtitle
+                          .copyWith(
                         fontSize: 11,
-                        color:
-                        AppColors.textSecondary,
+                        color: AppColors
+                            .textSecondary,
                       ),
                     ),
                   ],
@@ -1302,9 +1566,9 @@ class _AdminQuickAction
   }
 }
 
-// ============================================================
+// ================================================================
 // EMPTY CARD
-// ============================================================
+// ================================================================
 
 class _AdminEmptyCard
     extends StatelessWidget {
@@ -1317,14 +1581,16 @@ class _AdminEmptyCard
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context) {
     return Container(
       width: double.infinity,
       padding:
       const EdgeInsets.symmetric(
         vertical: 30,
       ),
-      decoration: BoxDecoration(
+      decoration:
+      BoxDecoration(
         color: Colors.white,
         borderRadius:
         BorderRadius.circular(18),
@@ -1334,17 +1600,21 @@ class _AdminEmptyCard
           Icon(
             icon,
             size: 38,
-            color: AppColors.textSecondary,
+            color:
+            AppColors.textSecondary,
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(
+            height: 10,
+          ),
 
           Text(
             message,
-            style:
-            AppTextStyles.subtitle.copyWith(
-              color:
-              AppColors.textSecondary,
+            style: AppTextStyles
+                .subtitle
+                .copyWith(
+              color: AppColors
+                  .textSecondary,
             ),
           ),
         ],
@@ -1353,26 +1623,29 @@ class _AdminEmptyCard
   }
 }
 
-// ============================================================
+// ================================================================
 // LOADING CARD
-// ============================================================
+// ================================================================
 
 class _AdminLoadingCard
     extends StatelessWidget {
   const _AdminLoadingCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+      BuildContext context) {
     return Container(
       width: double.infinity,
       height: 90,
-      decoration: BoxDecoration(
+      decoration:
+      BoxDecoration(
         color: Colors.white,
         borderRadius:
         BorderRadius.circular(18),
       ),
       child: const Center(
-        child: CircularProgressIndicator(),
+        child:
+        CircularProgressIndicator(),
       ),
     );
   }

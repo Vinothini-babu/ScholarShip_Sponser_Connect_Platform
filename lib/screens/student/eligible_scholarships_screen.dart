@@ -9,6 +9,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../models/application_model.dart';
 import '../../../services/application_service.dart';
 import '../../../services/saved_scholarship_service.dart';
+import '../../../utils/eligibility_utils.dart';
 
 class EligibleScholarshipsScreen extends StatefulWidget {
   const EligibleScholarshipsScreen({super.key});
@@ -27,83 +28,13 @@ class _EligibleScholarshipsScreenState
   final SavedScholarshipService _savedService =
   SavedScholarshipService();
 
-  double _toDouble(dynamic value) {
-    if (value == null) return 0;
-
-    if (value is num) {
-      return value.toDouble();
-    }
-
-    return double.tryParse(
-      value.toString().trim(),
-    ) ??
-        0;
-  }
-
   bool _matches(
       Map<String, dynamic> scholarship,
       Map<String, dynamic> student,
       ) {
-    final studentCourse =
-    (student["course"] ?? "")
-        .toString()
-        .trim()
-        .toLowerCase();
-
-    final studentCategory =
-    (student["category"] ?? "")
-        .toString()
-        .trim()
-        .toLowerCase();
-
-    final studentPercentage =
-    _toDouble(student["percentage"]);
-
-    final studentIncome =
-    _toDouble(student["annualIncome"]);
-
-    final requiredCourse =
-    (scholarship["eligibleCourse"] ?? "")
-        .toString()
-        .trim()
-        .toLowerCase();
-
-    final requiredCategory =
-    (scholarship["eligibleCategory"] ?? "")
-        .toString()
-        .trim()
-        .toLowerCase();
-
-    final minimumPercentage =
-    _toDouble(
-      scholarship["minimumPercentage"],
-    );
-
-    final maximumIncome =
-    _toDouble(
-      scholarship["maximumAnnualIncome"],
-    );
-
-    final courseEligible =
-        requiredCourse.isEmpty ||
-            requiredCourse == "all" ||
-            studentCourse == requiredCourse;
-
-    final categoryEligible =
-        requiredCategory.isEmpty ||
-            requiredCategory == "all" ||
-            studentCategory == requiredCategory;
-
-    final percentageEligible =
-        studentPercentage >= minimumPercentage;
-
-    final incomeEligible =
-        studentIncome <= maximumIncome;
-
-    return courseEligible &&
-        categoryEligible &&
-        percentageEligible &&
-        incomeEligible;
+    // Shared with the student dashboard's trending-scholarship tap check,
+    // so both places always agree on who counts as eligible.
+    return isStudentEligibleForScholarship(scholarship, student);
   }
 
   @override
@@ -140,10 +71,10 @@ class _EligibleScholarshipsScreenState
 
       body: StreamBuilder<
           DocumentSnapshot<Map<String, dynamic>>>(
-          stream: _firestore
-              .collection("users")
-              .doc(user.uid)
-              .snapshots(),
+        stream: _firestore
+            .collection("users")
+            .doc(user.uid)
+            .snapshots(),
 
         builder: (context, profileSnapshot) {
 
@@ -771,7 +702,7 @@ class _EligibleScholarshipCardState
       }
 
       // =========================================================
-       // 4. CREATE APPLICATION
+      // 4. CREATE APPLICATION
       // =========================================================
       final application = ApplicationModel(
         id: "",

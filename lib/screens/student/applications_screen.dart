@@ -31,75 +31,75 @@ class ApplicationScreen extends StatelessWidget {
         ),
         iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
-        body: StreamBuilder<List<ApplicationModel>>(
-          stream: _applicationService.getStudentApplications(
-            studentId,
-          ),
-          builder: (context, snapshot) {
-
-            if (snapshot.hasError) {
-              return Center(
-                child: Text(snapshot.error.toString()),
-              );
-            }
-
-            if (snapshot.connectionState ==
-                ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            }
-
-            if (!snapshot.hasData) {
-              return const Center(
-                child: Text("No Data"),
-              );
-            }
-
-            final applications = snapshot.data!;
-
-            print("Applications Count = ${applications.length}");
-
-            if (applications.isEmpty) {
-              return const Center(
-                child: Text("No Applications Found"),
-              );
-            }
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: applications.length,
-              itemBuilder: (context, index) {
-                final application = applications[index];
-
-                Color statusColor;
-
-                switch (application.status) {
-                  case "Approved":
-                    statusColor = AppColors.success;
-                    break;
-
-                  case "Rejected":
-                    statusColor = AppColors.error;
-                    break;
-
-                  default:
-                    statusColor = AppColors.warning;
-                }
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: ApplicationCard(
-                    title: application.scholarshipTitle,
-                    amount: application.amount,
-                    status: application.status,
-                    color: statusColor,
-                  ),
-                );
-              },
-            );
-          },
+      body: StreamBuilder<List<ApplicationModel>>(
+        stream: _applicationService.getStudentApplications(
+          studentId,
         ),
+        builder: (context, snapshot) {
+
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(snapshot.error.toString()),
+            );
+          }
+
+          if (snapshot.connectionState ==
+              ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+
+          if (!snapshot.hasData) {
+            return const Center(
+              child: Text("No Data"),
+            );
+          }
+
+          final applications = snapshot.data!;
+
+          print("Applications Count = ${applications.length}");
+
+          if (applications.isEmpty) {
+            return const Center(
+              child: Text("No Applications Found"),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: applications.length,
+            itemBuilder: (context, index) {
+              final application = applications[index];
+
+              Color statusColor;
+
+              switch (application.status) {
+                case "Approved":
+                  statusColor = AppColors.success;
+                  break;
+
+                case "Rejected":
+                  statusColor = AppColors.error;
+                  break;
+
+                default:
+                  statusColor = AppColors.warning;
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: ApplicationCard(
+                  title: application.scholarshipTitle,
+                  amount: application.amount,
+                  status: application.status,
+                  color: statusColor,
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

@@ -18,7 +18,21 @@ class _SplashScreenState extends State<SplashScreen>
   static const _splashDuration = Duration(milliseconds: 6500);
 
   late final AnimationController _controller;
-  late final Animation<double> _fade;
+
+  // Logo: scale + fade in first
+  late final Animation<double> _logoScale;
+  late final Animation<double> _logoFade;
+
+  // Title: fades + slides up slightly after the logo
+  late final Animation<double> _titleFade;
+  late final Animation<Offset> _titleSlide;
+
+  // Subtitle: fades + slides up after the title
+  late final Animation<double> _subtitleFade;
+  late final Animation<Offset> _subtitleSlide;
+
+  // Decorative circles: gentle scale-in for depth
+  late final Animation<double> _circleScale;
 
   @override
   void initState() {
@@ -26,10 +40,52 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 1400),
     )..forward();
 
-    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _circleScale = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+    );
+
+    _logoFade = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, 0.45, curve: Curves.easeOut),
+    );
+    _logoScale = Tween<double>(begin: 0.6, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.45, curve: Curves.easeOutBack),
+      ),
+    );
+
+    _titleFade = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.35, 0.7, curve: Curves.easeOut),
+    );
+    _titleSlide = Tween<Offset>(
+      begin: const Offset(0, 0.25),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.35, 0.7, curve: Curves.easeOut),
+      ),
+    );
+
+    _subtitleFade = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.55, 0.9, curve: Curves.easeOut),
+    );
+    _subtitleSlide = Tween<Offset>(
+      begin: const Offset(0, 0.25),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.55, 0.9, curve: Curves.easeOut),
+      ),
+    );
 
     Timer(_splashDuration, () {
       if (mounted) {
@@ -75,12 +131,15 @@ class _SplashScreenState extends State<SplashScreen>
           Positioned(
             top: -size.width * 0.22,
             right: -size.width * 0.28,
-            child: Container(
-              width: size.width * 0.75,
-              height: size.width * 0.75,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.secondary.withOpacity(0.12),
+            child: ScaleTransition(
+              scale: _circleScale,
+              child: Container(
+                width: size.width * 0.75,
+                height: size.width * 0.75,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.secondary.withOpacity(0.12),
+                ),
               ),
             ),
           ),
@@ -89,73 +148,94 @@ class _SplashScreenState extends State<SplashScreen>
           Positioned(
             bottom: -size.width * 0.2,
             left: -size.width * 0.22,
-            child: Container(
-              width: size.width * 0.6,
-              height: size.width * 0.6,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.05),
+            child: ScaleTransition(
+              scale: _circleScale,
+              child: Container(
+                width: size.width * 0.6,
+                height: size.width * 0.6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.05),
+                ),
               ),
             ),
           ),
 
           SafeArea(
-            child: FadeTransition(
-              opacity: _fade,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 36),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Logo sits on a soft white card so it stays legible
-                      // over both the navy top and paper bottom of the gradient
-                      Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.12),
-                              blurRadius: 24,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: const AppLogo(size: 88),
-                      ),
-
-                      const SizedBox(height: 30),
-
-                      Text(
-                        "Scholarship Sponsor\nConnect Platform",
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.title.copyWith(
-                          color: Colors.white,
-                          fontSize: 22,
-                          height: 1.3,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 36),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Logo sits on a soft white card so it stays legible
+                    // over both the navy top and paper bottom of the gradient
+                    FadeTransition(
+                      opacity: _logoFade,
+                      child: ScaleTransition(
+                        scale: _logoScale,
+                        child: Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.12),
+                                blurRadius: 24,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: const AppLogo(size: 88),
                         ),
                       ),
+                    ),
 
-                      const SizedBox(height: 16),
+                    const SizedBox(height: 30),
 
-                      Text(
-                        "\"Where opportunity meets ambition —\nconnecting students and sponsors\nto build brighter futures.\"",
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.subtitle.copyWith(
-                          color: Colors.white.withOpacity(0.85),
-                          fontStyle: FontStyle.italic,
-                          fontSize: 13,
-                          height: 1.5,
+                    FadeTransition(
+                      opacity: _titleFade,
+                      child: SlideTransition(
+                        position: _titleSlide,
+                        child: Text(
+                          "Scholarship Sponsor\nConnect Platform",
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.title.copyWith(
+                            color: Colors.white,
+                            fontSize: 22,
+                            height: 1.3,
+                          ),
                         ),
                       ),
+                    ),
 
-                      const SizedBox(height: 52),
+                    const SizedBox(height: 16),
 
-                      const _LoadingIndicator(),
-                    ],
-                  ),
+                    FadeTransition(
+                      opacity: _subtitleFade,
+                      child: SlideTransition(
+                        position: _subtitleSlide,
+                        child: Text(
+                          "\"Where opportunity meets ambition —\nconnecting students and sponsors\nto build brighter futures.\"",
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.subtitle.copyWith(
+                            color: Colors.white.withOpacity(0.85),
+                            fontStyle: FontStyle.italic,
+                            fontSize: 13,
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 52),
+
+                    FadeTransition(
+                      opacity: _subtitleFade,
+                      child: const _LoadingIndicator(),
+                    ),
+                  ],
                 ),
               ),
             ),

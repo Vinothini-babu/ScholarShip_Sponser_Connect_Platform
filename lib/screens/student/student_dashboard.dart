@@ -6,7 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 
 import 'search_screen.dart';
-import 'application_screen.dart';
+import 'applications_screen.dart';
 import 'profile_screen.dart';
 import '../../models/scholarship_model.dart';
 import '../../services/scholarship_service.dart';
@@ -14,7 +14,9 @@ import 'my_applications_screen.dart';
 import '../../services/saved_scholarship_service.dart';
 import 'saved/saved_scholarships_screen.dart';
 import 'eligible_scholarships_screen.dart';
+import 'scholarship_info_screen.dart';
 import 'upload_documents_screen.dart';
+import '../../utils/eligibility_utils.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -56,6 +58,79 @@ class _StudentDashboardState extends State<StudentDashboard> {
           MaterialPageRoute(builder: (_) => const ProfileScreen()),
         );
         break;
+    }
+  }
+
+  Future<void> _handleScholarshipTap(
+      BuildContext context,
+      String scholarshipId,
+      ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      ),
+    );
+
+    try {
+      final studentDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final scholarshipDoc = await FirebaseFirestore.instance
+          .collection('scholarships')
+          .doc(scholarshipId)
+          .get();
+
+      if (!context.mounted) return;
+      Navigator.pop(context); // close loading dialog
+
+      if (!scholarshipDoc.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("This scholarship is no longer available")),
+        );
+        return;
+      }
+
+      final studentData = studentDoc.data() ?? {};
+      final scholarshipData = scholarshipDoc.data() ?? {};
+
+      final eligible = isStudentEligibleForScholarship(
+        scholarshipData,
+        studentData,
+      );
+
+      if (!context.mounted) return;
+
+      if (eligible) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const EligibleScholarshipsScreen(),
+          ),
+        );
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ScholarshipInfoScreen(
+              scholarshipId: scholarshipId,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) Navigator.pop(context);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Something went wrong: $e")),
+        );
+      }
     }
   }
 
@@ -131,14 +206,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
                           deadline: scholarship.lastDate,
                           icon: Icons.school,
                           accent: AppColors.primary,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const EligibleScholarshipsScreen(),
-                              ),
-                            );
-                          },
+                          onTap: () => _handleScholarshipTap(
+                            context,
+                            scholarship.id,
+                          ),
                         );
                       },
                     );
@@ -533,7 +604,7 @@ class _StatsGrid extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) =>
-                          SavedScholarshipsScreen(),
+                            SavedScholarshipsScreen(),
                       ),
                     );
                   },
