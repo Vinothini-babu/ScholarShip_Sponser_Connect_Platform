@@ -32,11 +32,71 @@ class _UploadDocumentsScreenState
   bool _isUploading = false;
 
   // =============================================================
+  // DOCUMENT VALIDATION RULES
+  // =============================================================
+  //
+  // Basic "is this a real document, not a fake/placeholder file"
+  // check. True forgery detection needs OCR/ML, which is out of
+  // scope — this catches the common wrong-upload cases:
+  //   - wrong file type
+  //   - empty / near-empty placeholder files
+  //   - suspiciously large files
+  //   - filenames that give away a dummy/test file
+  //
+  static const int _minFileSizeBytes = 20 * 1024; // 20 KB
+  static const int _maxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
+
+  static const List<String> _suspiciousNameKeywords = [
+    "fake",
+    "dummy",
+    "sample",
+    "test",
+    "placeholder",
+  ];
+
+  final Map<String, String> _documentLabels = const {
+    "marksheet": "Marksheet",
+    "idProof": "ID Proof",
+    "income": "Income Certificate",
+    "collegeId": "College ID",
+  };
+
+  /// Returns null if the file passes validation, otherwise an
+  /// error message explaining why it was rejected.
+  String? _validateDocument(PlatformFile file, String documentType) {
+    final extension = (file.extension ?? "").toLowerCase();
+
+    if (!["pdf", "jpg", "jpeg", "png"].contains(extension)) {
+      return "Unsupported file type. Please upload a PDF or image.";
+    }
+
+    if (file.size < _minFileSizeBytes) {
+      return "This file looks empty or invalid. Please upload the "
+          "original ${_documentLabels[documentType]}.";
+    }
+
+    if (file.size > _maxFileSizeBytes) {
+      return "File is too large (max 5 MB). Please upload a valid "
+          "${_documentLabels[documentType]}.";
+    }
+
+    final lowerName = file.name.toLowerCase();
+    for (final keyword in _suspiciousNameKeywords) {
+      if (lowerName.contains(keyword)) {
+        return "This doesn't look like a genuine document. Please "
+            "upload your original ${_documentLabels[documentType]}.";
+      }
+    }
+
+    return null;
+  }
+
+  // =============================================================
   // PICK DOCUMENT
   // =============================================================
   Future<void> _pickDocument(String documentType) async {
     try {
-      final file = await FilePicker.pickFile(
+      final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: [
           "pdf",
@@ -46,7 +106,23 @@ class _UploadDocumentsScreenState
         ],
       );
 
-      if (file == null) {
+      if (result == null || result.files.isEmpty) {
+        return;
+      }
+
+      final file = result.files.single;
+
+      final validationError = _validateDocument(file, documentType);
+
+      if (validationError != null) {
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text(validationError),
+          ),
+        );
         return;
       }
 

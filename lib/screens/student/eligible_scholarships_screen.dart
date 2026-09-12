@@ -54,17 +54,16 @@ class _EligibleScholarshipsScreenState
       backgroundColor: AppColors.background,
 
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.primary,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(
-          color: AppColors.textPrimary,
-        ),
+        iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
           "Eligible Scholarships",
           style: AppTextStyles.title.copyWith(
             fontSize: 18,
-            color: AppColors.textPrimary,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
           ),
         ),
       ),
@@ -173,23 +172,37 @@ class _EligibleScholarshipsScreenState
 
                   final data = doc.data();
 
-                  return _EligibleScholarshipCard(
-                    scholarshipId: doc.id,
-                    title:
-                    data["title"]?.toString() ??
-                        "Scholarship",
-                    amount:
-                    data["amount"]?.toString() ??
-                        "",
-                    lastDate:
-                    _formatDate(
-                      data["lastDate"],
+                  return TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: Duration(milliseconds: 350 + (index * 80)),
+                    curve: Curves.easeOut,
+                    builder: (context, value, child) {
+                      return Opacity(
+                        opacity: value,
+                        child: Transform.translate(
+                          offset: Offset(0, (1 - value) * 24),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _EligibleScholarshipCard(
+                      scholarshipId: doc.id,
+                      title:
+                      data["title"]?.toString() ??
+                          "Scholarship",
+                      amount:
+                      data["amount"]?.toString() ??
+                          "",
+                      lastDate:
+                      _formatDate(
+                        data["lastDate"],
+                      ),
+                      eligibility:
+                      data["eligibility"]?.toString() ??
+                          "",
+                      savedService: _savedService,
+                      studentId: user.uid,
                     ),
-                    eligibility:
-                    data["eligibility"]?.toString() ??
-                        "",
-                    savedService: _savedService,
-                    studentId: user.uid,
                   );
                 },
               );
@@ -208,13 +221,21 @@ class _EligibleScholarshipsScreenState
           mainAxisSize: MainAxisSize.min,
           children: [
 
-            Icon(
-              Icons.workspace_premium_outlined,
-              size: 70,
-              color: AppColors.secondary,
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.secondary.withOpacity(0.10),
+              ),
+              child: Icon(
+                Icons.workspace_premium_outlined,
+                size: 56,
+                color: AppColors.secondary,
+              ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             Text(
               message,
@@ -376,17 +397,17 @@ class _EligibleScholarshipCardState
     });
 
     try {
-      final List<PlatformFile> result =
-      await FilePicker.pickFiles(
+      final FilePickerResult? result =
+      await FilePicker.platform.pickFiles(
         type: FileType.any,
         allowMultiple: false,
       );
 
-      if (result.isEmpty) {
+      if (result == null || result.files.isEmpty) {
         return;
       }
 
-      final PlatformFile file = result.first;
+      final PlatformFile file = result.files.first;
 
       if (file.path == null || file.path!.isEmpty) {
         throw Exception("Unable to get selected file path");
@@ -778,11 +799,14 @@ class _EligibleScholarshipCardState
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.08),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 5),
+            color: AppColors.primary.withOpacity(0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -797,14 +821,20 @@ class _EligibleScholarshipCardState
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.primary
-                      .withOpacity(0.10),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.primary,
+                      AppColors.primary.withOpacity(0.7),
+                    ],
+                  ),
                   borderRadius:
                   BorderRadius.circular(14),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.school_rounded,
-                  color: AppColors.primary,
+                  color: Colors.white,
                   size: 24,
                 ),
               ),
@@ -919,14 +949,17 @@ class _EligibleScholarshipCardState
             width: double.infinity,
             padding:
             const EdgeInsets.symmetric(
-              vertical: 9,
+              vertical: 10,
               horizontal: 12,
             ),
             decoration: BoxDecoration(
               color: AppColors.success
                   .withOpacity(0.08),
               borderRadius:
-              BorderRadius.circular(10),
+              BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.success.withOpacity(0.25),
+              ),
             ),
             child: Row(
               children: [
@@ -959,42 +992,67 @@ class _EligibleScholarshipCardState
 
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed:
-              _isApplying
-                  ? null
-                  : _applyScholarship,
-              style:
-              ElevatedButton.styleFrom(
-                backgroundColor:
-                AppColors.primary,
-                foregroundColor:
-                Colors.white,
-                padding:
-                const EdgeInsets.symmetric(
-                  vertical: 13,
+            height: 50,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                gradient: LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    AppColors.primary,
+                    AppColors.primary.withOpacity(0.82),
+                  ],
                 ),
-                shape:
-                RoundedRectangleBorder(
-                  borderRadius:
-                  BorderRadius.circular(12),
-                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.30),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              child: _isApplying
-                  ? const SizedBox(
-                width: 20,
-                height: 20,
-                child:
-                CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
+              child: ElevatedButton(
+                onPressed:
+                _isApplying
+                    ? null
+                    : _applyScholarship,
+                style:
+                ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  foregroundColor:
+                  Colors.white,
+                  shape:
+                  RoundedRectangleBorder(
+                    borderRadius:
+                    BorderRadius.circular(14),
+                  ),
                 ),
-              )
-                  : const Text(
-                "Apply Now",
-                style: TextStyle(
-                  fontWeight:
-                  FontWeight.w600,
+                child: _isApplying
+                    ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child:
+                  CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+                    : const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.send_rounded, size: 17, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text(
+                      "Apply Now",
+                      style: TextStyle(
+                        fontWeight:
+                        FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

@@ -6,7 +6,7 @@ import FlutterMacOS
 import Foundation
 
 import cloud_firestore
-import file_picker_darwin
+import file_picker
 import firebase_auth
 import firebase_core
 import firebase_storage
