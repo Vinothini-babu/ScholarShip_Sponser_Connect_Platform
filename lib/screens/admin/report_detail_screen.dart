@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 
 /// Generic read-only detail screen used by the Reports tabs to show
-/// the full record for a student, sponsor, or scholarship.
+/// the full record for a student, sponsor, scholarship, or application.
 class ReportDetailScreen extends StatelessWidget {
   final String headerTitle;
   final String headerSubtitle;
@@ -21,6 +22,15 @@ class ReportDetailScreen extends StatelessWidget {
     required this.data,
   });
 
+  // Field keys that get pulled out and shown as highlighted chips
+  // right under the header, instead of buried in the plain list.
+  static const List<String> _highlightKeys = [
+    "status",
+    "amount",
+    "percentage",
+    "category",
+  ];
+
   // Converts a Firestore field key like "phoneNumber" into
   // a readable label like "Phone Number".
   String _labelFor(String key) {
@@ -36,10 +46,55 @@ class ReportDetailScreen extends StatelessWidget {
         .join(' ');
   }
 
+  // Turns raw Firestore values (Timestamp, List, etc.) into readable text.
+  String _formatValue(dynamic value) {
+    if (value == null) return "—";
+
+    if (value is Timestamp) {
+      final d = value.toDate();
+      const months = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+      ];
+      final hour12 = d.hour % 12 == 0 ? 12 : d.hour % 12;
+      final ampm = d.hour >= 12 ? "PM" : "AM";
+      final minute = d.minute.toString().padLeft(2, '0');
+      return "${d.day} ${months[d.month - 1]} ${d.year}, $hour12:$minute $ampm";
+    }
+
+    if (value is List) {
+      return value.map((e) => e.toString()).join(", ");
+    }
+
+    final text = value.toString();
+    return text.isNotEmpty ? text : "—";
+  }
+
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case "approved":
+      case "active":
+        return AppColors.success;
+      case "rejected":
+      case "inactive":
+        return AppColors.error;
+      default:
+        return Colors.orange;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final entries = data.entries.toList()
+    final allEntries = data.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
+
+    final highlightEntries = allEntries
+        .where((e) => _highlightKeys.contains(e.key.toLowerCase()))
+        .toList();
+
+    final listEntries = allEntries
+        .where((e) => !_highlightKeys.contains(e.key.toLowerCase()))
+        .toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -50,24 +105,30 @@ class ReportDetailScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 
-              // ======================================================
+              // ==================================================
               // HEADER
-              // ======================================================
+              // ==================================================
 
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 26),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      color,
-                      color.withOpacity(.82),
-                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [color, color.withOpacity(.80)],
                   ),
                   borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(28),
                     bottomRight: Radius.circular(28),
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withOpacity(.25),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,6 +153,7 @@ class ReportDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Container(
                           width: 56,
@@ -139,11 +201,77 @@ class ReportDetailScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 22),
+              const SizedBox(height: 20),
 
-              // ======================================================
+              // ==================================================
+              // HIGHLIGHTED CHIPS (status / amount / etc.)
+              // ==================================================
+
+              if (highlightEntries.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: highlightEntries.map((entry) {
+                      final isStatus =
+                          entry.key.toLowerCase() == "status";
+                      final chipColor = isStatus
+                          ? _statusColor(entry.value.toString())
+                          : color;
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              chipColor.withOpacity(.16),
+                              chipColor.withOpacity(.06),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: chipColor.withOpacity(.3),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _labelFor(entry.key),
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: chipColor,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              entry.key.toLowerCase() == "amount"
+                                  ? "₹${_formatValue(entry.value)}"
+                                  : _formatValue(entry.value),
+                              style: AppTextStyles.title.copyWith(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+
+              const SizedBox(height: 20),
+
+              // ==================================================
               // FIELDS
-              // ======================================================
+              // ==================================================
 
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -152,11 +280,12 @@ class ReportDetailScreen extends StatelessWidget {
                   children: [
                     Text(
                       "All Information",
-                      style: AppTextStyles.title.copyWith(fontSize: 16),
+                      style:
+                      AppTextStyles.title.copyWith(fontSize: 16),
                     ),
                     const SizedBox(height: 12),
 
-                    if (entries.isEmpty)
+                    if (listEntries.isEmpty)
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(24),
@@ -187,9 +316,12 @@ class ReportDetailScreen extends StatelessWidget {
                           ],
                         ),
                         child: Column(
-                          children: List.generate(entries.length, (i) {
-                            final entry = entries[i];
-                            final isLast = i == entries.length - 1;
+                          children:
+                          List.generate(listEntries.length, (i) {
+                            final entry = listEntries[i];
+                            final isLast =
+                                i == listEntries.length - 1;
+                            final isEven = i % 2 == 0;
 
                             return Container(
                               padding: const EdgeInsets.symmetric(
@@ -197,6 +329,9 @@ class ReportDetailScreen extends StatelessWidget {
                                 vertical: 14,
                               ),
                               decoration: BoxDecoration(
+                                color: isEven
+                                    ? Colors.transparent
+                                    : color.withOpacity(.03),
                                 border: isLast
                                     ? null
                                     : Border(
@@ -211,27 +346,27 @@ class ReportDetailScreen extends StatelessWidget {
                                 CrossAxisAlignment.start,
                                 children: [
                                   SizedBox(
-                                    width: 130,
+                                    width: 150,
                                     child: Text(
                                       _labelFor(entry.key),
-                                      style:
-                                      AppTextStyles.subtitle.copyWith(
+                                      style: AppTextStyles.subtitle
+                                          .copyWith(
                                         fontSize: 13,
-                                        color: AppColors.textSecondary,
+                                        fontWeight: FontWeight.w500,
+                                        color:
+                                        AppColors.textSecondary,
                                       ),
                                     ),
                                   ),
                                   Expanded(
                                     child: Text(
-                                      entry.value?.toString().isNotEmpty ==
-                                          true
-                                          ? entry.value.toString()
-                                          : "—",
-                                      style:
-                                      AppTextStyles.subtitle.copyWith(
+                                      _formatValue(entry.value),
+                                      style: AppTextStyles.subtitle
+                                          .copyWith(
                                         fontSize: 13.5,
                                         fontWeight: FontWeight.w600,
                                         color: AppColors.textPrimary,
+                                        height: 1.4,
                                       ),
                                     ),
                                   ),
