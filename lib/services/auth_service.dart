@@ -18,6 +18,16 @@ class AuthService {
     required String course,
     required String password,
     required String role,
+    // Optional — currently only sent by the student signup screen.
+    // Nullable so sponsor/admin signups (which don't collect these)
+    // keep working without any change.
+    DateTime? dob,
+    String? state,
+    String? district,
+    String? rollNumber,
+    String? annualIncome,
+    String? yearOfStudy,
+    String? category,
   }) async {
     // Create Firebase Authentication account
     final UserCredential userCredential =
@@ -34,10 +44,7 @@ class AuthService {
     // IMPORTANT:
     // Store every user directly inside users/{uid}
     // This makes dashboard counts and role checking work correctly.
-    await _firestore
-        .collection("users")
-        .doc(uid)
-        .set({
+    final Map<String, dynamic> userData = {
       "uid": uid,
       "name": name,
       "email": email,
@@ -46,7 +53,21 @@ class AuthService {
       "course": course,
       "role": userRole,
       "createdAt": FieldValue.serverTimestamp(),
-    });
+    };
+
+    // Student-only eligibility/profile fields — only added when supplied,
+    // so sponsor/admin sign-ups (which don't pass them) are unaffected.
+    if (dob != null) userData["dob"] = Timestamp.fromDate(dob);
+    if (state != null && state.isNotEmpty) userData["state"] = state;
+    if (district != null && district.isNotEmpty) userData["district"] = district;
+    if (rollNumber != null && rollNumber.isNotEmpty) userData["rollNumber"] = rollNumber;
+    if (annualIncome != null && annualIncome.isNotEmpty) {
+      userData["annualIncome"] = num.tryParse(annualIncome) ?? annualIncome;
+    }
+    if (yearOfStudy != null && yearOfStudy.isNotEmpty) userData["yearOfStudy"] = yearOfStudy;
+    if (category != null && category.isNotEmpty) userData["category"] = category;
+
+    await _firestore.collection("users").doc(uid).set(userData);
 
     return userCredential;
   }

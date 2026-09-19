@@ -397,17 +397,16 @@ class _EligibleScholarshipCardState
     });
 
     try {
-      final FilePickerResult? result =
-      await FilePicker.platform.pickFiles(
+      // v13 API: FilePicker.pickFile() for a single selection, returning
+      // PlatformFile? directly — FilePickerResult and FilePicker.platform
+      // were both removed in file_picker v12+.
+      final PlatformFile? file = await FilePicker.pickFile(
         type: FileType.any,
-        allowMultiple: false,
       );
 
-      if (result == null || result.files.isEmpty) {
+      if (file == null) {
         return;
       }
-
-      final PlatformFile file = result.files.first;
 
       if (file.path == null || file.path!.isEmpty) {
         throw Exception("Unable to get selected file path");

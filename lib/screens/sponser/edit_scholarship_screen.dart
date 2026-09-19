@@ -28,10 +28,55 @@ class _EditScholarshipScreenState
   final eligibilityController = TextEditingController();
   final documentController = TextEditingController();
 
-  final eligibleCourseController = TextEditingController();
-  final eligibleCategoryController = TextEditingController();
   final minimumPercentageController = TextEditingController();
   final maximumIncomeController = TextEditingController();
+  final benefitsController = TextEditingController();
+  final selectionProcessController = TextEditingController();
+
+  final List<String> selectedCourses = [];
+  final List<String> selectedCategories = [];
+  final Set<String> expandedCourses = {}; // which courses currently show their specialization chips
+
+  final List<String> courseOptions = [
+    "All",
+    "B.Sc",
+    "B.A",
+    "B.Com",
+    "B.E",
+    "B.Tech",
+    "BBA",
+    "BCA",
+    "M.Sc",
+    "MBA",
+    "MCA",
+    "Diploma",
+  ];
+
+  /// Courses that have specific specializations. Tapping one of these in
+  /// the main chip row expands this list instead of selecting the course
+  /// itself — the actual eligible-course value stored is the specialization
+  /// (e.g. "Computer Science"), not the parent degree.
+  /// Courses NOT listed here (e.g. BCA) are selected directly, no expansion.
+  final Map<String, List<String>> courseSpecializations = {
+    "B.Sc": ["Computer Science", "Information Technology", "Cyber Security", "AI & ML"],
+    "B.Com": ["CA", "PA", "IT"],
+  };
+
+  final List<String> categoryOptions = [
+    "All",
+    "OC",
+    "BC",
+    "MBC",
+    "SC",
+    "ST",
+    "Minority",
+  ];
+
+  /// Strips anything that isn't a digit or a decimal point, so values typed
+  /// naturally like "60%" or "3,00,000" or "₹2,50,000" still parse correctly.
+  String _sanitizeNumber(String value) {
+    return value.replaceAll(RegExp(r'[^0-9.]'), '');
+  }
 
   String? category;
   DateTime? lastDate;
@@ -49,6 +94,21 @@ class _EditScholarshipScreenState
     "International",
     "Education Loan",
   ];
+
+  /// Fills [target] from a Firestore field that may be the newer
+  /// List<dynamic> (multi-select) or an older legacy single String value.
+  /// Empty/missing field → left empty, which our chip UI treats as "All".
+  void _loadIntoSelection(dynamic field, List<String> target) {
+    target.clear();
+    if (field == null) return;
+
+    if (field is List) {
+      target.addAll(field.map((e) => e.toString()).where((e) => e.isNotEmpty));
+    } else {
+      final asString = field.toString().trim();
+      if (asString.isNotEmpty) target.add(asString);
+    }
+  }
 
   // =========================================================
   // LOAD SCHOLARSHIP
@@ -88,11 +148,24 @@ class _EditScholarshipScreenState
       documentController.text =
           data["requiredDocuments"]?.toString() ?? "";
 
-      eligibleCourseController.text =
-          data["eligibleCourse"]?.toString() ?? "";
+      // eligibleCourse/eligibleCategory may be the newer List<String> or an
+      // older legacy single String — normalize either into our chip lists.
+      _loadIntoSelection(data["eligibleCourse"], selectedCourses);
+      _loadIntoSelection(data["eligibleCategory"], selectedCategories);
 
-      eligibleCategoryController.text =
-          data["eligibleCategory"]?.toString() ?? "";
+      // If a loaded course is actually a specialization (e.g. "Computer
+      // Science"), auto-expand its parent course chip so it's visible.
+      for (final entry in courseSpecializations.entries) {
+        if (entry.value.any(selectedCourses.contains)) {
+          expandedCourses.add(entry.key);
+        }
+      }
+
+      benefitsController.text =
+          data["benefits"]?.toString() ?? "";
+
+      selectionProcessController.text =
+          data["selectionProcess"]?.toString() ?? "";
 
       minimumPercentageController.text =
           data["minimumPercentage"]?.toString() ?? "";
@@ -196,7 +269,7 @@ class _EditScholarshipScreenState
     }
 
     final percentage = double.tryParse(
-      minimumPercentageController.text.trim(),
+      _sanitizeNumber(minimumPercentageController.text.trim()),
     );
 
     if (percentage == null ||
@@ -213,7 +286,7 @@ class _EditScholarshipScreenState
     }
 
     final income = double.tryParse(
-      maximumIncomeController.text.trim(),
+      _sanitizeNumber(maximumIncomeController.text.trim()),
     );
 
     if (income == null || income < 0) {
@@ -221,6 +294,28 @@ class _EditScholarshipScreenState
         const SnackBar(
           content: Text(
             "Enter a valid annual income",
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (selectedCourses.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Select at least one eligible course (or 'All')",
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (selectedCategories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Select at least one eligible category (or 'All')",
           ),
         ),
       );
@@ -252,16 +347,22 @@ class _EditScholarshipScreenState
         eligibilityController.text.trim(),
 
         "eligibleCourse":
-        eligibleCourseController.text.trim(),
+        selectedCourses.contains("All") ? <String>[] : selectedCourses,
 
         "eligibleCategory":
-        eligibleCategoryController.text.trim(),
+        selectedCategories.contains("All") ? <String>[] : selectedCategories,
 
         "minimumPercentage":
         percentage,
 
         "maximumAnnualIncome":
         income,
+
+        "benefits":
+        benefitsController.text.trim(),
+
+        "selectionProcess":
+        selectionProcessController.text.trim(),
 
         "requiredDocuments":
         documentController.text.trim(),
@@ -301,6 +402,223 @@ class _EditScholarshipScreenState
         });
       }
     }
+  }
+
+  /// Course chips where some courses (per courseSpecializations) expand
+  /// into a specialization sub-panel instead of being selected directly.
+  Widget _buildCourseSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.menu_book_rounded, size: 18, color: AppColors.textSecondary),
+            const SizedBox(width: 8),
+            Text("Eligible Course", style: AppTextStyles.subtitle.copyWith(fontSize: 13)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: courseOptions.map((course) {
+            final specs = courseSpecializations[course];
+            final bool hasSpecs = specs != null && specs.isNotEmpty;
+            final bool isExpanded = expandedCourses.contains(course);
+
+            final bool isSelected = course == "All"
+                ? selectedCourses.contains("All")
+                : hasSpecs
+                ? specs!.any(selectedCourses.contains)
+                : selectedCourses.contains(course);
+
+            return FilterChip(
+              label: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(course),
+                  if (hasSpecs) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                      size: 16,
+                    ),
+                  ],
+                ],
+              ),
+              selected: isSelected,
+              onSelected: (_) {
+                setState(() {
+                  if (course == "All") {
+                    selectedCourses
+                      ..clear()
+                      ..add("All");
+                    expandedCourses.clear();
+                    return;
+                  }
+
+                  selectedCourses.remove("All");
+
+                  if (hasSpecs) {
+                    if (isExpanded) {
+                      expandedCourses.remove(course);
+                    } else {
+                      expandedCourses.add(course);
+                    }
+                  } else {
+                    if (selectedCourses.contains(course)) {
+                      selectedCourses.remove(course);
+                    } else {
+                      selectedCourses.add(course);
+                    }
+                  }
+                });
+              },
+              selectedColor: AppColors.primary.withOpacity(0.15),
+              checkmarkColor: AppColors.primary,
+              labelStyle: TextStyle(
+                color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                ),
+              ),
+              backgroundColor: Colors.white,
+            );
+          }).toList(),
+        ),
+
+        for (final course in expandedCourses)
+          if (courseSpecializations[course] != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Choose $course specialization",
+                      style: AppTextStyles.subtitle.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: courseSpecializations[course]!.map((spec) {
+                        final bool isSpecSelected = selectedCourses.contains(spec);
+                        return FilterChip(
+                          label: Text(spec, style: const TextStyle(fontSize: 12.5)),
+                          selected: isSpecSelected,
+                          onSelected: (bool value) {
+                            setState(() {
+                              selectedCourses.remove("All");
+                              if (value) {
+                                selectedCourses.add(spec);
+                              } else {
+                                selectedCourses.remove(spec);
+                              }
+                            });
+                          },
+                          selectedColor: AppColors.primary.withOpacity(0.15),
+                          checkmarkColor: AppColors.primary,
+                          labelStyle: TextStyle(
+                            color: isSpecSelected ? AppColors.primary : AppColors.textPrimary,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(
+                              color: isSpecSelected ? AppColors.primary : Colors.grey.shade300,
+                            ),
+                          ),
+                          backgroundColor: Colors.white,
+                          visualDensity: VisualDensity.compact,
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+
+  /// A labeled group of selectable chips. Tapping "All" clears every other
+  /// selection; tapping any other chip while "All" is selected removes
+  /// "All" first.
+  Widget _buildMultiSelectSection({
+    required String title,
+    required IconData icon,
+    required List<String> options,
+    required List<String> selected,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 18, color: AppColors.textSecondary),
+            const SizedBox(width: 8),
+            Text(title, style: AppTextStyles.subtitle.copyWith(fontSize: 13)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((option) {
+            final bool isSelected = selected.contains(option);
+
+            return FilterChip(
+              label: Text(option),
+              selected: isSelected,
+              onSelected: (bool value) {
+                setState(() {
+                  if (option == "All") {
+                    selected
+                      ..clear()
+                      ..add("All");
+                  } else {
+                    selected.remove("All");
+                    if (value) {
+                      selected.add(option);
+                    } else {
+                      selected.remove(option);
+                    }
+                  }
+                });
+              },
+              selectedColor: AppColors.primary.withOpacity(0.15),
+              checkmarkColor: AppColors.primary,
+              labelStyle: TextStyle(
+                color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                ),
+              ),
+              backgroundColor: Colors.white,
+            );
+          }).toList(),
+        ),
+      ],
+    );
   }
 
   // =========================================================
@@ -491,30 +809,15 @@ class _EditScholarshipScreenState
               // ELIGIBLE COURSE
               // =================================================
 
-              _field(
-                controller:
-                eligibleCourseController,
-                label: "Eligible Course",
-                hint:
-                "e.g. B.Sc Computer Science",
-                icon:
-                Icons.menu_book_rounded,
-              ),
+              _buildCourseSelector(),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
-              // =================================================
-              // ELIGIBLE CATEGORY
-              // =================================================
-
-              _field(
-                controller:
-                eligibleCategoryController,
-                label: "Eligible Category",
-                hint:
-                "e.g. BC / MBC / SC / ST / OC",
-                icon:
-                Icons.category_rounded,
+              _buildMultiSelectSection(
+                title: "Eligible Category",
+                icon: Icons.category_rounded,
+                options: categoryOptions,
+                selected: selectedCategories,
               ),
 
               const SizedBox(height: 16),
@@ -542,7 +845,7 @@ class _EditScholarshipScreenState
 
                   final percentage =
                   double.tryParse(
-                    value.trim(),
+                    _sanitizeNumber(value.trim()),
                   );
 
                   if (percentage == null ||
@@ -582,7 +885,7 @@ class _EditScholarshipScreenState
 
                   final income =
                   double.tryParse(
-                    value.trim(),
+                    _sanitizeNumber(value.trim()),
                   );
 
                   if (income == null ||
@@ -591,6 +894,46 @@ class _EditScholarshipScreenState
                       "Enter a valid income";
                   }
 
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              // =================================================
+              // BENEFITS
+              // =================================================
+
+              _field(
+                controller: benefitsController,
+                label: "Benefits",
+                hint: "e.g. Full tuition fee waiver, monthly stipend of ₹2,000, mentorship program",
+                icon: Icons.card_giftcard_rounded,
+                maxLines: 3,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return "Enter Benefits";
+                  }
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              // =================================================
+              // SELECTION PROCESS
+              // =================================================
+
+              _field(
+                controller: selectionProcessController,
+                label: "Selection Process",
+                hint: "e.g. Application screening, document verification, merit-based shortlisting",
+                icon: Icons.fact_check_rounded,
+                maxLines: 3,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return "Enter Selection Process";
+                  }
                   return null;
                 },
               ),
@@ -752,10 +1095,10 @@ class _EditScholarshipScreenState
     eligibilityController.dispose();
     documentController.dispose();
 
-    eligibleCourseController.dispose();
-    eligibleCategoryController.dispose();
     minimumPercentageController.dispose();
     maximumIncomeController.dispose();
+    benefitsController.dispose();
+    selectionProcessController.dispose();
 
     super.dispose();
   }

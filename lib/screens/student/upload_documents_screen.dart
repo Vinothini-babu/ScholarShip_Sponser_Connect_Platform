@@ -63,19 +63,24 @@ class _UploadDocumentsScreenState
 
   /// Returns null if the file passes validation, otherwise an
   /// error message explaining why it was rejected.
-  String? _validateDocument(PlatformFile file, String documentType) {
+  Future<String?> _validateDocument(PlatformFile file, String documentType) async {
     final extension = (file.extension ?? "").toLowerCase();
 
     if (!["pdf", "jpg", "jpeg", "png"].contains(extension)) {
       return "Unsupported file type. Please upload a PDF or image.";
     }
 
-    if (file.size < _minFileSizeBytes) {
+    // PlatformFile.size was removed in file_picker v13 — lengthSync() gives
+    // the value the native picker already reported (no disk I/O), falling
+    // back to the async length() when that's not available.
+    final int fileSize = file.lengthSync() ?? await file.length() ?? 0;
+
+    if (fileSize < _minFileSizeBytes) {
       return "This file looks empty or invalid. Please upload the "
           "original ${_documentLabels[documentType]}.";
     }
 
-    if (file.size > _maxFileSizeBytes) {
+    if (fileSize > _maxFileSizeBytes) {
       return "File is too large (max 5 MB). Please upload a valid "
           "${_documentLabels[documentType]}.";
     }
@@ -96,7 +101,10 @@ class _UploadDocumentsScreenState
   // =============================================================
   Future<void> _pickDocument(String documentType) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      // v13 API: FilePicker.pickFile() for a single selection, returning
+      // PlatformFile? directly — no more FilePickerResult wrapper and no
+      // more FilePicker.platform.
+      final PlatformFile? file = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: [
           "pdf",
@@ -106,13 +114,11 @@ class _UploadDocumentsScreenState
         ],
       );
 
-      if (result == null || result.files.isEmpty) {
+      if (file == null) {
         return;
       }
 
-      final file = result.files.single;
-
-      final validationError = _validateDocument(file, documentType);
+      final validationError = await _validateDocument(file, documentType);
 
       if (validationError != null) {
         if (!mounted) return;

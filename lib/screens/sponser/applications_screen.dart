@@ -69,11 +69,7 @@ class ApplicationsScreen extends StatelessWidget {
                   child: _buildApplicationCard(
                     context,
                     documentId: doc.id,
-                    studentName: data["studentName"] ?? "",
-                    college: data["studentCollege"] ?? "",
-                    course: data["course"] ?? "",
-                    scholarship: data["scholarshipTitle"] ?? "",
-                    status: data["status"] ?? "Pending",
+                    data: data,
                   ),
                 );
 
@@ -87,24 +83,85 @@ class ApplicationsScreen extends StatelessWidget {
 
   Future<void> updateStatus(
       String documentId,
-      String status,
-      ) async {
+      String status, {
+        String? note,
+      }) async {
     await FirebaseFirestore.instance
         .collection("applications")
         .doc(documentId)
         .update({
       "status": status,
+      "statusHistory": FieldValue.arrayUnion([
+        {
+          "status": status,
+          "timestamp": Timestamp.now(),
+          "note": note ?? "",
+        }
+      ]),
     });
+  }
+
+  Future<String?> _showRejectReasonDialog(BuildContext context) {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            "Reject Application",
+            style: AppTextStyles.title.copyWith(fontSize: 17, color: AppColors.textPrimary),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Add a reason (optional) — the student will see this on their application timeline.",
+                style: AppTextStyles.subtitle.copyWith(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: "e.g. Income certificate did not match eligibility criteria",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.all(12),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text("Cancel", style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text("Reject"),
+            ),
+          ],
+        );
+      },
+    );
   }
   Widget _buildApplicationCard(
       BuildContext context, {
-        required String studentName,
-        required String college,
-        required String course,
-        required String scholarship,
         required String documentId,
-        required String status,
+        required Map<String, dynamic> data,
       }) {
+    final String studentName = data["studentName"]?.toString() ?? "";
+    final String college = data["studentCollege"]?.toString() ?? "";
+    final String course = data["course"]?.toString() ?? "";
+    final String scholarship = data["scholarshipTitle"]?.toString() ?? "";
+    final String status = data["status"]?.toString() ?? "Pending";
+    final bool isReviewed = status == "Approved" || status == "Rejected";
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -196,13 +253,7 @@ class ApplicationsScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (_) => ApplicationDetailsScreen(
-                      data: {
-                        "studentName": studentName,
-                        "studentCollege": college,
-                        "course": course,
-                        "scholarshipTitle": scholarship,
-                        "status": status,
-                      },
+                      data: data,
                       applicationId: documentId,
                     ),
                   ),
@@ -222,69 +273,79 @@ class ApplicationsScreen extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 12),
+          // Once reviewed, hide Approve/Reject so sponsors can't
+          // accidentally overwrite an already-decided application.
+          if (!isReviewed) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
 
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () async {
+                      await updateStatus(
+                        documentId,
+                        "Approved",
+                      );
 
-                    await updateStatus(
-                      documentId,
-                      "Approved",
-                    );
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("$studentName Approved Successfully ✅"),
+                        ),
+                      );
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text("$studentName Approved Successfully ✅"),
+                    },
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text("Approve"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    );
-
-                  },
-                  icon: const Icon(Icons.check_rounded, size: 18),
-                  label: const Text("Approve"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () async {
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
 
-                    await updateStatus(
-                      documentId,
-                      "Rejected",
-                    );
+                      final reason = await _showRejectReasonDialog(context);
+                      // User cancelled the dialog — don't reject.
+                      if (reason == null) return;
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text("$studentName Rejected ❌"),
+                      await updateStatus(
+                        documentId,
+                        "Rejected",
+                        note: reason.isNotEmpty ? reason : null,
+                      );
+
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text("$studentName Rejected ❌"),
+                        ),
+                      );
+
+                    },
+                    icon: Icon(Icons.close_rounded, size: 18, color: AppColors.error),
+                    label: Text("Reject", style: TextStyle(color: AppColors.error)),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: AppColors.error, width: 1.4),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    );
-
-                  },
-                  icon: Icon(Icons.close_rounded, size: 18, color: AppColors.error),
-                  label: Text("Reject", style: TextStyle(color: AppColors.error)),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: AppColors.error, width: 1.4),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ],
       ),
     );

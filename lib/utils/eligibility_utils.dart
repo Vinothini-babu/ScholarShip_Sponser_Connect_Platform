@@ -15,6 +15,24 @@ double parseNumericValue(dynamic value) {
   return double.tryParse(value.toString().trim()) ?? 0;
 }
 
+/// Normalizes an `eligibleCourse` / `eligibleCategory` field into a
+/// lowercase, trimmed list — regardless of whether it was saved as the
+/// newer List<String> (multi-select) or an older single String value
+/// (legacy scholarships created before multi-select was added).
+List<String> _normalizeToList(dynamic field) {
+  if (field == null) return [];
+
+  if (field is List) {
+    return field
+        .map((e) => e.toString().trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  final asString = field.toString().trim().toLowerCase();
+  return asString.isEmpty ? [] : [asString];
+}
+
 class EligibilityResult {
   final bool isEligible;
   final List<String> reasons; // empty when eligible
@@ -43,23 +61,21 @@ EligibilityResult checkScholarshipEligibility(
 
   final studentIncome = parseNumericValue(student["annualIncome"]);
 
-  final requiredCourse =
-  (scholarship["eligibleCourse"] ?? "").toString().trim().toLowerCase();
+  final requiredCourses = _normalizeToList(scholarship["eligibleCourse"]);
 
-  final requiredCategory =
-  (scholarship["eligibleCategory"] ?? "").toString().trim().toLowerCase();
+  final requiredCategories = _normalizeToList(scholarship["eligibleCategory"]);
 
   final minimumPercentage = parseNumericValue(scholarship["minimumPercentage"]);
 
   final maximumIncome = parseNumericValue(scholarship["maximumAnnualIncome"]);
 
-  final courseEligible = requiredCourse.isEmpty ||
-      requiredCourse == "all" ||
-      studentCourse == requiredCourse;
+  final courseEligible = requiredCourses.isEmpty ||
+      requiredCourses.contains("all") ||
+      requiredCourses.contains(studentCourse);
 
-  final categoryEligible = requiredCategory.isEmpty ||
-      requiredCategory == "all" ||
-      studentCategory == requiredCategory;
+  final categoryEligible = requiredCategories.isEmpty ||
+      requiredCategories.contains("all") ||
+      requiredCategories.contains(studentCategory);
 
   final percentageEligible = studentPercentage >= minimumPercentage;
 
@@ -69,13 +85,13 @@ EligibilityResult checkScholarshipEligibility(
 
   if (!courseEligible) {
     reasons.add(
-      "Open only to ${scholarship["eligibleCourse"]} students. Your course: ${student["course"] ?? "Not set"}.",
+      "Open only to ${requiredCourses.join(', ')} students. Your course: ${student["course"] ?? "Not set"}.",
     );
   }
 
   if (!categoryEligible) {
     reasons.add(
-      "Open only to ${scholarship["eligibleCategory"]} category. Your category: ${student["category"] ?? "Not set"}.",
+      "Open only to ${requiredCategories.join(', ')} category. Your category: ${student["category"] ?? "Not set"}.",
     );
   }
 

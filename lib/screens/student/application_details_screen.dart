@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../widgets/status_timeline.dart'; // adjust path if your widgets folder differs
 
 /// Shows the full details of a single submitted application.
 /// Opened from MyApplicationsScreen's "View Details" button.
@@ -32,9 +33,14 @@ class ApplicationDetailsScreen extends StatelessWidget {
         statusColor = AppColors.warning;
     }
 
+    final List<StatusHistoryEntry> statusHistory =
+    StatusHistoryEntry.listFromData(data);
+
     String appliedDate = "Date not available";
+    DateTime? appliedAtDate;
     if (data["appliedAt"] is Timestamp) {
       final DateTime date = (data["appliedAt"] as Timestamp).toDate();
+      appliedAtDate = date;
       appliedDate =
       "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
     }
@@ -142,6 +148,14 @@ class ApplicationDetailsScreen extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+
+            const SizedBox(height: 20),
+
+            StatusTimeline(
+              history: statusHistory,
+              currentStatus: status,
+              appliedAt: appliedAtDate,
             ),
 
             const SizedBox(height: 12),

@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.scholarship_sponser_connect_platform"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
