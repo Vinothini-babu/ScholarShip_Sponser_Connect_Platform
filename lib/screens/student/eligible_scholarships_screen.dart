@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:scholarship_sponser_connect_platform/screens/student/scholarship_applications_screen.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 
-import '../../../models/application_model.dart';
-import '../../../services/application_service.dart';
 import '../../../services/saved_scholarship_service.dart';
 import '../../../utils/eligibility_utils.dart';
+import 'scholarship_applications_screen.dart';
+
+/// Fallback list used only for scholarships published before the
+/// sponsor-defined "Required Documents" chip picker existed, so old
+/// scholarships without a requiredDocuments field don't break.
+const List<String> _legacyDefaultDocuments = [
+  "Marksheet",
+  "ID Proof",
+  "Income Certificate",
+  "College ID",
+];
 
 class EligibleScholarshipsScreen extends StatefulWidget {
   const EligibleScholarshipsScreen({super.key});
@@ -200,6 +209,12 @@ class _EligibleScholarshipsScreenState
                       eligibility:
                       data["eligibility"]?.toString() ??
                           "",
+                      requiredDocuments: (data["requiredDocuments"] is List &&
+                          (data["requiredDocuments"] as List).isNotEmpty)
+                          ? (data["requiredDocuments"] as List)
+                          .map((e) => e.toString())
+                          .toList()
+                          : _legacyDefaultDocuments,
                       savedService: _savedService,
                       studentId: user.uid,
                     ),
@@ -277,6 +292,7 @@ class _EligibleScholarshipCard extends StatefulWidget {
   final String amount;
   final String lastDate;
   final String eligibility;
+  final List<String> requiredDocuments;
 
   final SavedScholarshipService savedService;
   final String studentId;
@@ -287,6 +303,7 @@ class _EligibleScholarshipCard extends StatefulWidget {
     required this.amount,
     required this.lastDate,
     required this.eligibility,
+    required this.requiredDocuments,
     required this.savedService,
     required this.studentId,
   });
@@ -296,19 +313,11 @@ class _EligibleScholarshipCard extends StatefulWidget {
       _EligibleScholarshipCardState();
 }
 
+
 class _EligibleScholarshipCardState
     extends State<_EligibleScholarshipCard> {
-
-  final ApplicationService _applicationService =
-  ApplicationService();
-
-  bool _isApplying = false;
   bool _isSaved = false;
   bool _isSaving = false;
-
-  Map<String, String> _documents = {};
-
-  bool _isPickingDocument = false;
 
   @override
   void initState() {
@@ -389,405 +398,21 @@ class _EligibleScholarshipCardState
       }
     }
   }
-  Future<void> _pickDocument(String documentType) async {
-    if (_isPickingDocument) return;
 
-    setState(() {
-      _isPickingDocument = true;
-    });
-
-    try {
-      // v13 API: FilePicker.pickFile() for a single selection, returning
-      // PlatformFile? directly — FilePickerResult and FilePicker.platform
-      // were both removed in file_picker v12+.
-      final PlatformFile? file = await FilePicker.pickFile(
-        type: FileType.any,
-      );
-
-      if (file == null) {
-        return;
-      }
-
-      if (file.path == null || file.path!.isEmpty) {
-        throw Exception("Unable to get selected file path");
-      }
-
-      if (!mounted) return;
-
-      setState(() {
-        _documents[documentType] = file.path!;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "${_documentLabel(documentType)} selected",
-          ),
+  void _goToApplicationScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ScholarshipApplicationScreen(
+          scholarshipId: widget.scholarshipId,
+          title: widget.title,
+          amount: widget.amount,
+          lastDate: widget.lastDate,
+          eligibility: widget.eligibility,
+          requiredDocuments: widget.requiredDocuments,
         ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "Unable to select document: $e",
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isPickingDocument = false;
-        });
-      }
-    }
-  }
-  String _documentLabel(String documentType) {
-    switch (documentType) {
-      case "marksheet":
-        return "Marksheet";
-
-      case "idProof":
-        return "ID Proof";
-
-      case "incomeCertificate":
-        return "Income Certificate";
-
-      case "collegeId":
-        return "College ID";
-
-      default:
-        return "Document";
-    }
-  }
-  Widget _documentUploadSection() {
-    final documents = [
-      {
-        "key": "marksheet",
-        "title": "Marksheet",
-        "icon": Icons.description_outlined,
-      },
-      {
-        "key": "idProof",
-        "title": "ID Proof",
-        "icon": Icons.badge_outlined,
-      },
-      {
-        "key": "incomeCertificate",
-        "title": "Income Certificate",
-        "icon": Icons.account_balance_outlined,
-      },
-      {
-        "key": "collegeId",
-        "title": "College ID",
-        "icon": Icons.school_outlined,
-      },
-    ];
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: AppColors.primary.withOpacity(0.12),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.folder_copy_outlined,
-                color: AppColors.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                "Upload Documents",
-                style: AppTextStyles.title.copyWith(
-                  fontSize: 16,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 6),
-
-          Text(
-            "Upload the documents required for this scholarship.",
-            style: AppTextStyles.subtitle.copyWith(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          ...documents.map((document) {
-            final key = document["key"] as String;
-            final title = document["title"] as String;
-            final icon = document["icon"] as IconData;
-
-            final selectedPath = _documents[key];
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.10),
-                      borderRadius: BorderRadius.circular(11),
-                    ),
-                    child: Icon(
-                      icon,
-                      color: AppColors.primary,
-                      size: 20,
-                    ),
-                  ),
-
-                  const SizedBox(width: 10),
-
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style:
-                          AppTextStyles.subtitle.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-
-                        const SizedBox(height: 3),
-
-                        Text(
-                          selectedPath == null
-                              ? "No file selected"
-                              : selectedPath.split('\\').last,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                          AppTextStyles.subtitle.copyWith(
-                            fontSize: 11,
-                            color: selectedPath == null
-                                ? AppColors.textSecondary
-                                : AppColors.success,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(width: 8),
-
-                  OutlinedButton(
-                    onPressed: _isPickingDocument
-                        ? null
-                        : () => _pickDocument(key),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: BorderSide(
-                        color: AppColors.primary,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                        BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: Text(
-                      selectedPath == null
-                          ? "Choose"
-                          : "Change",
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
       ),
     );
-  }
-  Future<void> _applyScholarship() async {
-    if (_isApplying) return;
-
-    setState(() {
-      _isApplying = true;
-    });
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-
-      if (user == null) {
-        throw Exception("Please login again");
-      }
-
-      final firestore = FirebaseFirestore.instance;
-
-      // =========================================================
-      // 1. GET STUDENT PROFILE
-      // =========================================================
-
-      final studentSnapshot = await firestore
-          .collection("users")
-          .doc(user.uid)
-          .get();
-
-      if (!studentSnapshot.exists) {
-        throw Exception("Student profile not found");
-      }
-
-      final studentData = studentSnapshot.data()!;
-
-      final studentName =
-          studentData["name"]?.toString().trim() ?? "";
-
-      final studentCollege =
-          studentData["college"]?.toString().trim() ?? "";
-
-      final studentEmail =
-          studentData["email"]?.toString().trim() ??
-              user.email ??
-              "";
-
-      print("====================================");
-      print("Student UID     : ${user.uid}");
-      print("Student Name   : $studentName");
-      print("Student College: $studentCollege");
-      print("Student Email  : $studentEmail");
-      print("====================================");
-
-      if (studentName.isEmpty) {
-        throw Exception("Student name is empty in profile");
-      }
-
-      if (studentCollege.isEmpty) {
-        throw Exception("Student college is empty in profile");
-      }
-
-      // =========================================================
-      // 2. GET SCHOLARSHIP
-      // =========================================================
-
-      final scholarshipSnapshot = await firestore
-          .collection("scholarships")
-          .doc(widget.scholarshipId)
-          .get();
-
-      if (!scholarshipSnapshot.exists) {
-        throw Exception("Scholarship not found");
-      }
-
-      // IMPORTANT:
-      // scholarshipData is declared here
-      final scholarshipData =
-      scholarshipSnapshot.data()!;
-
-      // =========================================================
-      // 3. GET SPONSOR ID FROM SCHOLARSHIP
-      // =========================================================
-
-      final sponsorId =
-          scholarshipData["sponsorId"]?.toString().trim() ?? "";
-
-      print("Sponsor ID: $sponsorId");
-
-      if (sponsorId.isEmpty) {
-        throw Exception(
-          "Sponsor information is missing for this scholarship",
-        );
-      }
-
-      // =========================================================
-      // 4. CREATE APPLICATION
-      // =========================================================
-      final application = ApplicationModel(
-        id: "",
-        studentId: user.uid,
-        studentName: studentData["name"]?.toString() ?? "",
-        studentEmail: studentData["email"]?.toString() ?? "",
-        studentCollege: studentData["college"]?.toString() ?? "",
-        sponsorId: sponsorId,
-        scholarshipId: widget.scholarshipId,
-        scholarshipTitle: widget.title,
-        amount: widget.amount,
-        status: "Pending",
-        appliedAt: Timestamp.now(),
-        documents: _documents,
-      );
-
-      // =========================================================
-      // 5. DEBUG - CHECK DATA BEFORE SAVING
-      // =========================================================
-
-      print("========== SAVING APPLICATION ==========");
-      print(application.toMap());
-      print("========================================");
-
-      // =========================================================
-      // 6. SAVE APPLICATION
-      // =========================================================
-
-      final result =
-      await _applicationService.applyScholarship(
-        application,
-      );
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result == "Success"
-                ? "Application submitted successfully"
-                : result == "Already Applied"
-                ? "You already applied for this scholarship"
-                : "Application failed: $result",
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      print("APPLICATION ERROR: $e");
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "Unable to apply: $e",
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isApplying = false;
-        });
-      }
-    }
   }
 
   @override
@@ -810,10 +435,8 @@ class _EligibleScholarshipCardState
         ],
       ),
       child: Column(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           Row(
             children: [
               Container(
@@ -828,8 +451,7 @@ class _EligibleScholarshipCardState
                       AppColors.primary.withOpacity(0.7),
                     ],
                   ),
-                  borderRadius:
-                  BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Icon(
                   Icons.school_rounded,
@@ -837,34 +459,24 @@ class _EligibleScholarshipCardState
                   size: 24,
                 ),
               ),
-
               const SizedBox(width: 14),
-
               Expanded(
                 child: Text(
                   widget.title,
-                  style:
-                  AppTextStyles.subtitle.copyWith(
+                  style: AppTextStyles.subtitle.copyWith(
                     fontSize: 16,
-                    fontWeight:
-                    FontWeight.bold,
-                    color:
-                    AppColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
-
               IconButton(
-                onPressed:
-                _isSaving ? null : _toggleSave,
+                onPressed: _isSaving ? null : _toggleSave,
                 icon: Icon(
                   _isSaved
                       ? Icons.favorite_rounded
                       : Icons.favorite_border_rounded,
-                  color:
-                  _isSaved
-                      ? AppColors.error
-                      : AppColors.textSecondary,
+                  color: _isSaved ? AppColors.error : AppColors.textSecondary,
                 ),
               ),
             ],
@@ -874,21 +486,13 @@ class _EligibleScholarshipCardState
 
           Row(
             children: [
-              Icon(
-                Icons.currency_rupee_rounded,
-                size: 16,
-                color:
-                AppColors.textSecondary,
-              ),
+              Icon(Icons.currency_rupee_rounded, size: 16, color: AppColors.textSecondary),
               const SizedBox(width: 5),
               Text(
                 widget.amount,
-                style:
-                AppTextStyles.subtitle.copyWith(
-                  fontWeight:
-                  FontWeight.w600,
-                  color:
-                  AppColors.textPrimary,
+                style: AppTextStyles.subtitle.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
@@ -898,21 +502,11 @@ class _EligibleScholarshipCardState
 
           Row(
             children: [
-              Icon(
-                Icons.calendar_today_rounded,
-                size: 15,
-                color:
-                AppColors.textSecondary,
-              ),
+              Icon(Icons.calendar_today_rounded, size: 15, color: AppColors.textSecondary),
               const SizedBox(width: 5),
               Text(
                 "Deadline: ${widget.lastDate}",
-                style:
-                AppTextStyles.subtitle.copyWith(
-                  fontSize: 13,
-                  color:
-                  AppColors.textSecondary,
-                ),
+                style: AppTextStyles.subtitle.copyWith(fontSize: 13, color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -921,24 +515,14 @@ class _EligibleScholarshipCardState
 
           Container(
             width: double.infinity,
-            padding:
-            const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.warning
-                  .withOpacity(0.08),
-              borderRadius:
-              BorderRadius.circular(12),
+              color: AppColors.warning.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              widget.eligibility.isEmpty
-                  ? "Eligible based on your profile"
-                  : widget.eligibility,
-              style:
-              AppTextStyles.subtitle.copyWith(
-                fontSize: 12,
-                color:
-                AppColors.textPrimary,
-              ),
+              widget.eligibility.isEmpty ? "Eligible based on your profile" : widget.eligibility,
+              style: AppTextStyles.subtitle.copyWith(fontSize: 12, color: AppColors.textPrimary),
             ),
           ),
 
@@ -946,46 +530,44 @@ class _EligibleScholarshipCardState
 
           Container(
             width: double.infinity,
-            padding:
-            const EdgeInsets.symmetric(
-              vertical: 10,
-              horizontal: 12,
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
             decoration: BoxDecoration(
-              color: AppColors.success
-                  .withOpacity(0.08),
-              borderRadius:
-              BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.success.withOpacity(0.25),
-              ),
+              color: AppColors.success.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.success.withOpacity(0.25)),
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.check_circle_rounded,
-                  size: 17,
-                  color:
-                  AppColors.success,
-                ),
+                Icon(Icons.check_circle_rounded, size: 17, color: AppColors.success),
                 const SizedBox(width: 7),
                 Text(
                   "Eligible for you",
-                  style:
-                  AppTextStyles.subtitle.copyWith(
+                  style: AppTextStyles.subtitle.copyWith(
                     fontSize: 12,
-                    fontWeight:
-                    FontWeight.w600,
-                    color:
-                    AppColors.success,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.success,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 14),
 
-          _documentUploadSection(),
+          const SizedBox(height: 6),
+
+          // Documents are now filled out on a dedicated screen instead of
+          // inline in this scrollable card list.
+          Row(
+            children: [
+              Icon(Icons.folder_copy_outlined, size: 14, color: AppColors.textSecondary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  "${widget.requiredDocuments.length} document(s) required — fill them in on the next screen",
+                  style: AppTextStyles.subtitle.copyWith(fontSize: 11.5, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
+          ),
 
           const SizedBox(height: 14),
 
@@ -998,10 +580,7 @@ class _EligibleScholarshipCardState
                 gradient: LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
-                  colors: [
-                    AppColors.primary,
-                    AppColors.primary.withOpacity(0.82),
-                  ],
+                  colors: [AppColors.primary, AppColors.primary.withOpacity(0.82)],
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -1012,44 +591,21 @@ class _EligibleScholarshipCardState
                 ],
               ),
               child: ElevatedButton(
-                onPressed:
-                _isApplying
-                    ? null
-                    : _applyScholarship,
-                style:
-                ElevatedButton.styleFrom(
+                onPressed: _goToApplicationScreen,
+                style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
-                  foregroundColor:
-                  Colors.white,
-                  shape:
-                  RoundedRectangleBorder(
-                    borderRadius:
-                    BorderRadius.circular(14),
-                  ),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-                child: _isApplying
-                    ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child:
-                  CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-                    : const Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.send_rounded, size: 17, color: Colors.white),
                     SizedBox(width: 8),
                     Text(
                       "Apply Now",
-                      style: TextStyle(
-                        fontWeight:
-                        FontWeight.w600,
-                        fontSize: 15,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                     ),
                   ],
                 ),

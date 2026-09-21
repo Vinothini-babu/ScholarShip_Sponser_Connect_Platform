@@ -54,6 +54,22 @@ class _UploadDocumentsScreenState
     "placeholder",
   ];
 
+  // Filename patterns that strongly suggest a screenshot or screen
+  // recording rather than a scanned/photographed original document.
+  static const List<String> _screenshotNameKeywords = [
+    "screenshot",
+    "screen_shot",
+    "screen-shot",
+    "screen shot",
+    "screenrecording",
+    "screen_recording",
+    "screen-recording",
+    "img_wa",
+    "img-wa",
+    "snip",
+    "capture",
+  ];
+
   final Map<String, String> _documentLabels = const {
     "marksheet": "Marksheet",
     "idProof": "ID Proof",
@@ -86,6 +102,15 @@ class _UploadDocumentsScreenState
     }
 
     final lowerName = file.name.toLowerCase();
+
+    for (final keyword in _screenshotNameKeywords) {
+      if (lowerName.contains(keyword)) {
+        return "Screenshots are not accepted. Please upload the original "
+            "scanned copy or photo of your ${_documentLabels[documentType]} "
+            "(PDF, JPG, or PNG) — not a screenshot.";
+      }
+    }
+
     for (final keyword in _suspiciousNameKeywords) {
       if (lowerName.contains(keyword)) {
         return "This doesn't look like a genuine document. Please "
@@ -126,7 +151,14 @@ class _UploadDocumentsScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.error,
-            content: Text(validationError),
+            duration: const Duration(seconds: 4),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(child: Text(validationError)),
+              ],
+            ),
           ),
         );
         return;
