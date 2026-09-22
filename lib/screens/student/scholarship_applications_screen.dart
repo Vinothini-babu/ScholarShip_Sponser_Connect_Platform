@@ -43,6 +43,7 @@ class ScholarshipApplicationScreen extends StatefulWidget {
 class _ScholarshipApplicationScreenState extends State<ScholarshipApplicationScreen> {
   final ApplicationService _applicationService = ApplicationService();
   final TextEditingController _statementController = TextEditingController();
+  final TextEditingController _percentageController = TextEditingController();
 
   // documentName -> local file path picked for it
   final Map<String, String> _documents = {};
@@ -53,8 +54,14 @@ class _ScholarshipApplicationScreenState extends State<ScholarshipApplicationScr
   @override
   void dispose() {
     _statementController.dispose();
+    _percentageController.dispose();
     super.dispose();
   }
+
+  /// Strips anything that isn't a digit or a decimal point — same helper
+  /// used in add_scholarship_screen.dart, kept local here since this screen
+  /// doesn't import that file.
+  String _sanitizeNumber(String value) => value.replaceAll(RegExp(r'[^0-9.]'), '');
 
   // =============================================================
   // VALIDATION RULES (kept in sync with upload_documents_screen.dart)
@@ -248,6 +255,17 @@ class _ScholarshipApplicationScreenState extends State<ScholarshipApplicationScr
       return;
     }
 
+    final percentage = double.tryParse(_sanitizeNumber(_percentageController.text.trim()));
+    if (percentage == null || percentage < 0 || percentage > 100) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.error,
+          content: const Text("Please enter a valid academic percentage between 0 and 100."),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isApplying = true);
 
     try {
@@ -278,6 +296,32 @@ class _ScholarshipApplicationScreenState extends State<ScholarshipApplicationScr
         throw Exception("Sponsor information is missing for this scholarship");
       }
 
+      // =========================================================
+      // EVALUATION SCORE (out of 100) — gives the sponsor an objective
+      // way to rank applicants instead of reading every application by
+      // hand. Weighting: Academic 50 + Financial need 30 + Document
+      // verification 20 (the last 20 is filled in later by the sponsor,
+      // once they've reviewed the uploaded documents).
+      // =========================================================
+      final academicScore = percentage.clamp(0, 100) / 100 * 50;
+
+      final maxIncome = (scholarshipData["maximumAnnualIncome"] is num)
+          ? (scholarshipData["maximumAnnualIncome"] as num).toDouble()
+          : double.tryParse(_sanitizeNumber(scholarshipData["maximumAnnualIncome"]?.toString() ?? "")) ?? 0;
+
+      final studentIncomeRaw = studentData["annualIncome"];
+      final studentIncome = (studentIncomeRaw is num)
+          ? studentIncomeRaw.toDouble()
+          : double.tryParse(_sanitizeNumber(studentIncomeRaw?.toString() ?? "")) ?? 0;
+
+      double incomeScore;
+      if (maxIncome > 0) {
+        final ratio = (studentIncome / maxIncome).clamp(0.0, 1.0);
+        incomeScore = 30 * (1 - ratio); // lower income relative to the cap → higher score
+      } else {
+        incomeScore = 15; // sponsor didn't set an income cap — neutral half-score
+      }
+
       final application = ApplicationModel(
         id: "",
         studentId: user.uid,
@@ -299,11 +343,11 @@ class _ScholarshipApplicationScreenState extends State<ScholarshipApplicationScr
       final result = await _applicationService.applyScholarship(application);
       final success = result == "Success";
 
-      // ApplicationModel doesn't carry a statement-of-purpose field, so it's
-      // attached with a follow-up update once the application exists —
-      // studentId + scholarshipId is unique per student (enforced by the
-      // "Already Applied" check above), so this always finds the right doc.
-      if (success && _statementController.text.trim().isNotEmpty) {
+      // ApplicationModel doesn't carry these fields yet, so they're attached
+      // with a follow-up update once the application exists — studentId +
+      // scholarshipId is unique per student (enforced by the "Already
+      // Applied" check above), so this always finds the right doc.
+      if (success) {
         final createdQuery = await firestore
             .collection("applications")
             .where("studentId", isEqualTo: user.uid)
@@ -314,6 +358,11 @@ class _ScholarshipApplicationScreenState extends State<ScholarshipApplicationScr
         if (createdQuery.docs.isNotEmpty) {
           await createdQuery.docs.first.reference.update({
             "statementOfPurpose": _statementController.text.trim(),
+            "academicPercentage": percentage,
+            "academicScore": academicScore,
+            "incomeScore": incomeScore,
+            "documentsScore": 0,
+            "totalScore": academicScore + incomeScore,
           });
         }
       }
@@ -428,6 +477,40 @@ class _ScholarshipApplicationScreenState extends State<ScholarshipApplicationScr
             ),
             const SizedBox(height: 14),
             const _YourDetailsCard(),
+
+            const SizedBox(height: 20),
+
+            Text("Academic Performance", style: AppTextStyles.title.copyWith(fontSize: 18, color: AppColors.textPrimary)),
+            const SizedBox(height: 6),
+            Text(
+              "Your latest overall percentage — used by the sponsor to evaluate your application.",
+              style: AppTextStyles.subtitle.copyWith(fontSize: 12.5, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _percentageController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+              decoration: InputDecoration(
+                hintText: "e.g. 78.5",
+                prefixIcon: Icon(Icons.percent_rounded, color: AppColors.textSecondary, size: 21),
+                filled: true,
+                fillColor: AppColors.card,
+                contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.15)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.15)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: AppColors.primary, width: 1.6),
+                ),
+              ),
+            ),
 
             const SizedBox(height: 20),
 

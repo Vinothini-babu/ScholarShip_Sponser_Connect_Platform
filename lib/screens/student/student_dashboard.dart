@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:scholarship_sponser_connect_platform/screens/sponser/applications_screen.dart';
+import 'package:scholarship_sponser_connect_platform/screens/sponser/applications/sponsor_applications_screen.dart';
+import 'package:scholarship_sponser_connect_platform/screens/sponser/applications/sponsor_applications_screen.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
@@ -49,7 +50,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
       case 2:
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => ApplicationsScreen()),
+          MaterialPageRoute(builder: (_) => SponsorApplicationsScreen()),
         );
         break;
 
