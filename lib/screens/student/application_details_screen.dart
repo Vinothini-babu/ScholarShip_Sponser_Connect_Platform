@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../widgets/status_timeline.dart'; // adjust path if your widgets folder differs
+import 'upload_semester_update_screen.dart';
 
 /// Shows the full details of a single submitted application.
 /// Opened from MyApplicationsScreen's "View Details" button.
@@ -158,6 +159,18 @@ class ApplicationDetailsScreen extends StatelessWidget {
               appliedAt: appliedAtDate,
             ),
 
+            // Semester renewal — only relevant once the application itself
+            // is approved. Shows the student's current semester and a
+            // button into UploadSemesterUpdateScreen (which itself handles
+            // showing history / pending-review / suspended states).
+            if (status == "Approved") ...[
+              const SizedBox(height: 20),
+              _SemesterUpdateCard(
+                applicationId: applicationId,
+                currentSemester: (data["currentSemester"] is int) ? data["currentSemester"] as int : 1,
+              ),
+            ],
+
             const SizedBox(height: 12),
 
             Text(
@@ -169,6 +182,93 @@ class ApplicationDetailsScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SemesterUpdateCard extends StatelessWidget {
+  final String applicationId;
+  final int currentSemester;
+
+  const _SemesterUpdateCard({
+    required this.applicationId,
+    required this.currentSemester,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primary.withOpacity(0.15)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.history_edu_rounded, color: AppColors.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Semester $currentSemester",
+                      style: AppTextStyles.subtitle.copyWith(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "Completed this semester? Upload your marksheet to continue your scholarship.",
+                      style: AppTextStyles.subtitle.copyWith(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => UploadSemesterUpdateScreen(applicationId: applicationId),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.upload_file_rounded, size: 18),
+              label: const Text("Semester Updates"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

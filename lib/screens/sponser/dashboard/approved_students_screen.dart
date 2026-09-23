@@ -477,8 +477,8 @@ class _ApprovedStudentCard
                   MaterialPageRoute(
                     builder: (_) =>
                         ApplicationDetailsScreen(
-                          application:
-                          application,
+                          data: application.toMap(),
+                          applicationId: application.id,
                         ),
                   ),
                 );

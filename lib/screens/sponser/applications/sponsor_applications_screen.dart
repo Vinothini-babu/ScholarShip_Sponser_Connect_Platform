@@ -463,7 +463,8 @@ class _ApplicationCard extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (_) => ApplicationDetailsScreen(
-                      application: application,
+                      data: application.toMap(),
+                      applicationId: application.id,
                     ),
                   ),
                 );

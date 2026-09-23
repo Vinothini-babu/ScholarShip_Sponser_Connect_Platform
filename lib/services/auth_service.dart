@@ -14,8 +14,11 @@ class AuthService {
     required String name,
     required String email,
     required String mobile,
-    required String college,
-    required String course,
+    // No longer required — only the student signup form collects these.
+    // Kept as plain (non-nullable) Strings with an empty default so
+    // existing call sites that already pass them keep compiling unchanged.
+    String college = "",
+    String course = "",
     required String password,
     required String role,
     // Optional — currently only sent by the student signup screen.
@@ -28,6 +31,11 @@ class AuthService {
     String? annualIncome,
     String? yearOfStudy,
     String? category,
+    // Sponsor-only fields — nullable so student/admin signups (which
+    // don't collect these) are unaffected.
+    String? organizationName,
+    String? registrationNumber,
+    String? proofDocumentUrl,
   }) async {
     // Create Firebase Authentication account
     final UserCredential userCredential =
@@ -49,14 +57,14 @@ class AuthService {
       "name": name,
       "email": email,
       "mobile": mobile,
-      "college": college,
-      "course": course,
       "role": userRole,
       "createdAt": FieldValue.serverTimestamp(),
     };
 
     // Student-only eligibility/profile fields — only added when supplied,
     // so sponsor/admin sign-ups (which don't pass them) are unaffected.
+    if (college.isNotEmpty) userData["college"] = college;
+    if (course.isNotEmpty) userData["course"] = course;
     if (dob != null) userData["dob"] = Timestamp.fromDate(dob);
     if (state != null && state.isNotEmpty) userData["state"] = state;
     if (district != null && district.isNotEmpty) userData["district"] = district;
@@ -66,6 +74,17 @@ class AuthService {
     }
     if (yearOfStudy != null && yearOfStudy.isNotEmpty) userData["yearOfStudy"] = yearOfStudy;
     if (category != null && category.isNotEmpty) userData["category"] = category;
+
+    // Sponsor-only fields.
+    if (organizationName != null && organizationName.isNotEmpty) {
+      userData["organizationName"] = organizationName;
+    }
+    if (registrationNumber != null && registrationNumber.isNotEmpty) {
+      userData["registrationNumber"] = registrationNumber;
+    }
+    if (proofDocumentUrl != null && proofDocumentUrl.isNotEmpty) {
+      userData["proofDocumentUrl"] = proofDocumentUrl;
+    }
 
     await _firestore.collection("users").doc(uid).set(userData);
 
