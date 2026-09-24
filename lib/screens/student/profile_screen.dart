@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../auth/role_selection_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -363,7 +364,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                             if (!context.mounted) return;
 
-                            Navigator.pop(context);
+                            // Clears the whole navigation stack so back/swipe
+                            // can't return into the dashboard after logout.
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
+                                  (route) => false,
+                            );
                           },
 
                           icon: Icon(
