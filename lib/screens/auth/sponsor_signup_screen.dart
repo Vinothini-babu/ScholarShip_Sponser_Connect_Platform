@@ -1,4 +1,3 @@
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -191,12 +190,12 @@ class _SponsorSignupScreenState extends State<SponsorSignupScreen> {
   }) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: AppTextStyles.subtitle.copyWith(fontSize: 15),
-      prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 21),
+      hintStyle: AppTextStyles.subtitle.copyWith(fontSize: 15.5),
+      prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 22),
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: AppColors.card,
-      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+      contentPadding: const EdgeInsets.symmetric(vertical: 19, horizontal: 4),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.15)),
@@ -225,332 +224,487 @@ class _SponsorSignupScreenState extends State<SponsorSignupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Navy gradient header — matches login/splash/role screens
-            Stack(
-              clipBehavior: Clip.none,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Wide (desktop) — split layout: gradient logo/intro panel on the
+          // left, scrollable form on the right. Narrow (mobile) — falls
+          // back to the original stacked header-then-form layout.
+          final bool isSplit = constraints.maxWidth > 900;
+
+          if (isSplit) return _buildSplitLayout(context);
+          return _buildStackedLayout(context);
+        },
+      ),
+    );
+  }
+
+  // ==============================
+  // WIDE / DESKTOP — split layout
+  // ==============================
+  Widget _buildSplitLayout(BuildContext context) {
+    return Row(
+      children: [
+        // Left — static gradient panel with logo + intro copy
+        Expanded(
+          flex: 5,
+          child: Container(
+            height: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.primary, AppColors.primary.withOpacity(0.88)],
+              ),
+            ),
+            child: Stack(
+              clipBehavior: Clip.hardEdge,
               children: [
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 26, 24, 30),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [AppColors.primary, AppColors.primary.withOpacity(0.88)],
+                // Decorative circles — same treatment as splash_screen.dart,
+                // so this feels like a continuation of the same identity.
+                Positioned(
+                  top: -90,
+                  right: -110,
+                  child: Container(
+                    width: 300,
+                    height: 300,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.secondary.withOpacity(0.12),
                     ),
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(32),
-                      bottomRight: Radius.circular(32),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                        child: const AppLogo(size: 48),
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        "Sponsor Sign Up",
-                        style: AppTextStyles.heading.copyWith(fontSize: 24, color: Colors.white),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Partner with Scholarship Sponsor Connect",
-                        style: AppTextStyles.subtitle.copyWith(color: Colors.white.withOpacity(0.8)),
-                      ),
-                    ],
                   ),
                 ),
                 Positioned(
-                  top: -size.width * 0.15,
-                  right: -size.width * 0.18,
+                  bottom: -100,
+                  left: -110,
                   child: Container(
-                    width: size.width * 0.5,
-                    height: size.width * 0.5,
-                    decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.secondary.withOpacity(0.10)),
+                    width: 260,
+                    height: 260,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.05),
+                    ),
+                  ),
+                ),
+
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 44),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.12),
+                                blurRadius: 24,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: const AppLogo(size: 120),
+                        ),
+                        const SizedBox(height: 36),
+                        Text(
+                          "Sponsor Sign Up",
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.heading.copyWith(fontSize: 40, color: Colors.white),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          "Partner with Scholarship Sponsor Connect",
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.subtitle.copyWith(
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: 19,
+                          ),
+                        ),
+
+                        const SizedBox(height: 56),
+                        Text(
+                          "\"Empower ambition — fund the next\ngeneration of achievers.\"",
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.subtitle.copyWith(
+                            color: Colors.white.withOpacity(0.7),
+                            fontStyle: FontStyle.italic,
+                            fontSize: 17,
+                            height: 1.6,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
+          ),
+        ),
 
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isWide = constraints.maxWidth > 720;
-
-                return Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 760),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // ==============================
-                          // ORGANIZATION DETAILS
-                          // ==============================
-                          _SectionHeader(icon: Icons.apartment_rounded, title: "Organization Details"),
-                          const SizedBox(height: 16),
-
-                          TextField(
-                            controller: organizationController,
-                            style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-                            decoration: _fieldDecoration(
-                                hint: "Organization / Trust Name", icon: Icons.apartment_rounded),
-                          ),
-                          const SizedBox(height: 16),
-
-                          TextField(
-                            controller: registrationController,
-                            style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-                            decoration: _fieldDecoration(
-                                hint: "Registration / PAN Number", icon: Icons.badge_outlined),
-                          ),
-                          const SizedBox(height: 16),
-
-                          _pair(
-                            isWide,
-                            DropdownButtonFormField<String>(
-                              value: _selectedState,
-                              isExpanded: true,
-                              icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
-                              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-                              decoration: _fieldDecoration(hint: "State", icon: Icons.map_outlined),
-                              items: _stateOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                              onChanged: (value) => setState(() => _selectedState = value),
-                            ),
-                            TextField(
-                              controller: districtController,
-                              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-                              decoration:
-                              _fieldDecoration(hint: "District / City", icon: Icons.location_city_outlined),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Proof document upload
-                          InkWell(
-                            onTap: _pickProofDocument,
-                            borderRadius: BorderRadius.circular(14),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: AppColors.card,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: _proofDocument != null
-                                      ? AppColors.success
-                                      : AppColors.textSecondary.withOpacity(0.15),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    _proofDocument != null
-                                        ? Icons.check_circle_rounded
-                                        : Icons.upload_file_rounded,
-                                    color: _proofDocument != null ? AppColors.success : AppColors.primary,
-                                    size: 21,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      _proofDocument?.name ?? "Upload Registration Certificate (PDF, JPG, PNG)",
-                                      style: AppTextStyles.subtitle.copyWith(fontSize: 14),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 28),
-
-                          // ==============================
-                          // CONTACT PERSON
-                          // ==============================
-                          _SectionHeader(icon: Icons.person_outline_rounded, title: "Contact Person"),
-                          const SizedBox(height: 16),
-
-                          TextField(
-                            controller: nameController,
-                            style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-                            decoration: _fieldDecoration(hint: "Contact Person Name", icon: Icons.person_outline_rounded),
-                          ),
-                          const SizedBox(height: 16),
-
-                          _pair(
-                            isWide,
-                            TextField(
-                              controller: emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-                              decoration: _fieldDecoration(hint: "Email Address", icon: Icons.email_outlined),
-                            ),
-                            TextField(
-                              controller: mobileController,
-                              keyboardType: TextInputType.phone,
-                              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-                              decoration: _fieldDecoration(hint: "Mobile Number", icon: Icons.phone_outlined),
-                            ),
-                          ),
-
-                          const SizedBox(height: 28),
-
-                          // ==============================
-                          // ACCOUNT SECURITY
-                          // ==============================
-                          _SectionHeader(icon: Icons.lock_outline_rounded, title: "Account Security"),
-                          const SizedBox(height: 16),
-
-                          _pair(
-                            isWide,
-                            TextField(
-                              controller: passwordController,
-                              obscureText: obscurePassword,
-                              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-                              decoration: _fieldDecoration(
-                                hint: "Password",
-                                icon: Icons.lock_outline_rounded,
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                    color: AppColors.textSecondary,
-                                    size: 20,
-                                  ),
-                                  onPressed: () => setState(() => obscurePassword = !obscurePassword),
-                                ),
-                              ),
-                            ),
-                            TextField(
-                              controller: confirmPasswordController,
-                              obscureText: obscureConfirmPassword,
-                              style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-                              decoration: _fieldDecoration(
-                                hint: "Confirm Password",
-                                icon: Icons.lock_outline_rounded,
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    obscureConfirmPassword
-                                        ? Icons.visibility_off_outlined
-                                        : Icons.visibility_outlined,
-                                    color: AppColors.textSecondary,
-                                    size: 20,
-                                  ),
-                                  onPressed: () =>
-                                      setState(() => obscureConfirmPassword = !obscureConfirmPassword),
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // ==============================
-                          // TERMS & CONDITIONS
-                          // ==============================
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: Checkbox(
-                                  value: _agreedToTerms,
-                                  activeColor: AppColors.primary,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-                                  onChanged: (value) => setState(() => _agreedToTerms = value ?? false),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _agreedToTerms = !_agreedToTerms),
-                                  child: RichText(
-                                    text: TextSpan(
-                                      style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 13),
-                                      children: [
-                                        const TextSpan(text: "I agree to the "),
-                                        TextSpan(
-                                          text: "Terms & Conditions",
-                                          style: TextStyle(
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.w700,
-                                            decoration: TextDecoration.underline,
-                                          ),
-                                          recognizer: TapGestureRecognizer()
-                                            ..onTap = () => Navigator.push(
-                                              context,
-                                              MaterialPageRoute(builder: (_) => const TermsConditionsScreen()),
-                                            ),
-                                        ),
-                                        const TextSpan(text: " and "),
-                                        TextSpan(
-                                          text: "Privacy Policy",
-                                          style: TextStyle(
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.w700,
-                                            decoration: TextDecoration.underline,
-                                          ),
-                                          recognizer: TapGestureRecognizer()
-                                            ..onTap = () => Navigator.push(
-                                              context,
-                                              MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
-                                            ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 26),
-
-                          SizedBox(
-                            width: double.infinity,
-                            height: 54,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _handleSignup,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                height: 20, width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
-                              )
-                                  : const Text("Create Sponsor Account",
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-                        ],
+        // Right — scrollable form, vertically centered when it's shorter
+        // than the viewport (plain Center inside a SingleChildScrollView
+        // doesn't do this on its own — needs a bounded-minHeight wrapper).
+        Expanded(
+          flex: 5,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 760),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 56),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: _buildFormFields(true),
+                        ),
                       ),
                     ),
                   ),
-                );
-              },
-            ),
-          ],
+                ),
+              );
+            },
+          ),
         ),
+      ],
+    );
+  }
+
+  // ==============================
+  // NARROW / MOBILE — stacked layout (original)
+  // ==============================
+  Widget _buildStackedLayout(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Navy gradient header — matches login/splash/role screens
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 26, 24, 30),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.primary, AppColors.primary.withOpacity(0.88)],
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(32),
+                    bottomRight: Radius.circular(32),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      child: const AppLogo(size: 48),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      "Sponsor Sign Up",
+                      style: AppTextStyles.heading.copyWith(fontSize: 24, color: Colors.white),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Partner with Scholarship Sponsor Connect",
+                      style: AppTextStyles.subtitle.copyWith(color: Colors.white.withOpacity(0.8)),
+                    ),
+                  ],
+                ),
+              ),
+              Positioned(
+                top: -size.width * 0.15,
+                right: -size.width * 0.18,
+                child: Container(
+                  width: size.width * 0.5,
+                  height: size.width * 0.5,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.secondary.withOpacity(0.10)),
+                ),
+              ),
+            ],
+          ),
+
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _buildFormFields(false),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  // ==============================
+  // Shared form fields — used by both layouts above
+  // ==============================
+  List<Widget> _buildFormFields(bool isWide) {
+    return [
+      // ==============================
+      // ORGANIZATION DETAILS
+      // ==============================
+      _SectionHeader(icon: Icons.apartment_rounded, title: "Organization Details"),
+      const SizedBox(height: 16),
+
+      TextField(
+        controller: organizationController,
+        style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+        decoration: _fieldDecoration(
+            hint: "Organization / Trust Name", icon: Icons.apartment_rounded),
+      ),
+      const SizedBox(height: 16),
+
+      TextField(
+        controller: registrationController,
+        style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+        decoration: _fieldDecoration(
+            hint: "Registration / PAN Number", icon: Icons.badge_outlined),
+      ),
+      const SizedBox(height: 16),
+
+      _pair(
+        isWide,
+        DropdownButtonFormField<String>(
+          value: _selectedState,
+          isExpanded: true,
+          icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
+          style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+          decoration: _fieldDecoration(hint: "State", icon: Icons.map_outlined),
+          items: _stateOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+          onChanged: (value) => setState(() => _selectedState = value),
+        ),
+        TextField(
+          controller: districtController,
+          style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+          decoration:
+          _fieldDecoration(hint: "District / City", icon: Icons.location_city_outlined),
+        ),
+      ),
+      const SizedBox(height: 16),
+
+      // Proof document upload
+      InkWell(
+        onTap: _pickProofDocument,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: _proofDocument != null
+                  ? AppColors.success
+                  : AppColors.textSecondary.withOpacity(0.15),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _proofDocument != null
+                    ? Icons.check_circle_rounded
+                    : Icons.upload_file_rounded,
+                color: _proofDocument != null ? AppColors.success : AppColors.primary,
+                size: 21,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _proofDocument?.name ?? "Upload Registration Certificate (PDF, JPG, PNG)",
+                  style: AppTextStyles.subtitle.copyWith(fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+
+      const SizedBox(height: 34),
+
+      // ==============================
+      // CONTACT PERSON
+      // ==============================
+      _SectionHeader(icon: Icons.person_outline_rounded, title: "Contact Person"),
+      const SizedBox(height: 16),
+
+      TextField(
+        controller: nameController,
+        style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+        decoration: _fieldDecoration(hint: "Contact Person Name", icon: Icons.person_outline_rounded),
+      ),
+      const SizedBox(height: 16),
+
+      _pair(
+        isWide,
+        TextField(
+          controller: emailController,
+          keyboardType: TextInputType.emailAddress,
+          style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+          decoration: _fieldDecoration(hint: "Email Address", icon: Icons.email_outlined),
+        ),
+        TextField(
+          controller: mobileController,
+          keyboardType: TextInputType.phone,
+          style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+          decoration: _fieldDecoration(hint: "Mobile Number", icon: Icons.phone_outlined),
+        ),
+      ),
+
+      const SizedBox(height: 34),
+
+      // ==============================
+      // ACCOUNT SECURITY
+      // ==============================
+      _SectionHeader(icon: Icons.lock_outline_rounded, title: "Account Security"),
+      const SizedBox(height: 16),
+
+      _pair(
+        isWide,
+        TextField(
+          controller: passwordController,
+          obscureText: obscurePassword,
+          style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+          decoration: _fieldDecoration(
+            hint: "Password",
+            icon: Icons.lock_outline_rounded,
+            suffixIcon: IconButton(
+              icon: Icon(
+                obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
+              onPressed: () => setState(() => obscurePassword = !obscurePassword),
+            ),
+          ),
+        ),
+        TextField(
+          controller: confirmPasswordController,
+          obscureText: obscureConfirmPassword,
+          style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
+          decoration: _fieldDecoration(
+            hint: "Confirm Password",
+            icon: Icons.lock_outline_rounded,
+            suffixIcon: IconButton(
+              icon: Icon(
+                obscureConfirmPassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
+              onPressed: () =>
+                  setState(() => obscureConfirmPassword = !obscureConfirmPassword),
+            ),
+          ),
+        ),
+      ),
+
+      const SizedBox(height: 20),
+
+      // ==============================
+      // TERMS & CONDITIONS
+      // ==============================
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: Checkbox(
+              value: _agreedToTerms,
+              activeColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+              onChanged: (value) => setState(() => _agreedToTerms = value ?? false),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _agreedToTerms = !_agreedToTerms),
+              child: RichText(
+                text: TextSpan(
+                  style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 13),
+                  children: [
+                    const TextSpan(text: "I agree to the "),
+                    TextSpan(
+                      text: "Terms & Conditions",
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.underline,
+                      ),
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const TermsConditionsScreen()),
+                        ),
+                    ),
+                    const TextSpan(text: " and "),
+                    TextSpan(
+                      text: "Privacy Policy",
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.underline,
+                      ),
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                        ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+
+      const SizedBox(height: 26),
+
+      SizedBox(
+        width: double.infinity,
+        height: 54,
+        child: ElevatedButton(
+          onPressed: _isLoading ? null : _handleSignup,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+          child: _isLoading
+              ? const SizedBox(
+            height: 20, width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+          )
+              : const Text("Create Sponsor Account",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ),
+      ),
+
+      const SizedBox(height: 20),
+    ];
   }
 }
 

@@ -61,7 +61,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
     if (_selectedRole == null) return;
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      // .name turns the enum into "student"/"sponsor"/"admin" — matches
+      // the role strings used everywhere else in the app (Firestore
+      // "role" field, AuthService.getUserRole(), etc.)
+      MaterialPageRoute(builder: (_) => LoginScreen(initialRole: _selectedRole!.name)),
     );
   }
 

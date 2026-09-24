@@ -7,11 +7,17 @@ import '../../services/auth_service.dart';
 import '../../widgets/app_logo.dart';
 import '../student/student_dashboard.dart';
 import 'signup_screen.dart';
+import 'sponsor_signup_screen.dart';
 import '../sponser/sponser_dashboard.dart';
 import '../admin/admin_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  // Which role was picked on RoleSelectionScreen — "student"/"sponsor"/
+  // "admin". Nullable so LoginScreen still works if reached any other
+  // way (defaults to the student signup flow below).
+  final String? initialRole;
+
+  const LoginScreen({super.key, this.initialRole});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -86,6 +92,24 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _handleCreateAccountTap() {
+    // Admin accounts aren't self-service — route to the existing-admin
+    // creation flow inside the Admin Panel instead.
+    if (widget.initialRole == "admin") {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Admin accounts are created by an existing admin from the Admin Panel."),
+        ),
+      );
+      return;
+    }
+
+    final Widget target =
+    widget.initialRole == "sponsor" ? const SponsorSignupScreen() : const SignupScreen();
+
+    Navigator.push(context, MaterialPageRoute(builder: (_) => target));
   }
 
   InputDecoration _fieldDecoration({
@@ -335,12 +359,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: AppTextStyles.subtitle.copyWith(fontSize: 14),
                         ),
                         GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const SignupScreen()),
-                            );
-                          },
+                          onTap: _handleCreateAccountTap,
                           child: Text(
                             "Create Account",
                             style: AppTextStyles.subtitle.copyWith(
