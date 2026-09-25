@@ -11,5 +11,15 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  // Secondary named app — same Firebase project, but its own independent
+  // Auth session. Used only by AdminService.createAdmin() so that creating
+  // a new admin account doesn't sign the currently-logged-in admin out of
+  // the app (which is what FirebaseAuth.instance.createUserWithEmailAndPassword
+  // would otherwise do, since it auto-signs-in as the newly created user).
+  await Firebase.initializeApp(
+    name: "SecondaryApp",
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   runApp(const ScholarshipSponsorConnectApp());
 }

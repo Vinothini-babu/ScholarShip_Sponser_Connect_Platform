@@ -26,7 +26,6 @@ class _EditScholarshipScreenState
   final descriptionController = TextEditingController();
   final amountController = TextEditingController();
   final eligibilityController = TextEditingController();
-  final documentController = TextEditingController();
 
   final minimumPercentageController = TextEditingController();
   final maximumIncomeController = TextEditingController();
@@ -35,6 +34,18 @@ class _EditScholarshipScreenState
 
   final List<String> selectedCourses = [];
   final List<String> selectedCategories = [];
+  final List<String> selectedDocuments = [];
+
+  final List<String> documentOptions = [
+    "Aadhaar Card",
+    "Income Certificate",
+    "Community Certificate",
+    "Bonafide Certificate",
+    "Marksheet/Transcript",
+    "Bank Passbook",
+    "Passport Photo",
+    "Fee Receipt",
+  ];
   final Set<String> expandedCourses = {}; // which courses currently show their specialization chips
 
   final List<String> courseOptions = [
@@ -145,13 +156,12 @@ class _EditScholarshipScreenState
       eligibilityController.text =
           data["eligibility"]?.toString() ?? "";
 
-      documentController.text =
-          data["requiredDocuments"]?.toString() ?? "";
-
-      // eligibleCourse/eligibleCategory may be the newer List<String> or an
-      // older legacy single String — normalize either into our chip lists.
+      // eligibleCourse/eligibleCategory/requiredDocuments may be the newer
+      // List<String> or an older legacy single String — normalize either
+      // into our chip lists.
       _loadIntoSelection(data["eligibleCourse"], selectedCourses);
       _loadIntoSelection(data["eligibleCategory"], selectedCategories);
+      _loadIntoSelection(data["requiredDocuments"], selectedDocuments);
 
       // If a loaded course is actually a specialization (e.g. "Computer
       // Science"), auto-expand its parent course chip so it's visible.
@@ -322,6 +332,17 @@ class _EditScholarshipScreenState
       return;
     }
 
+    if (selectedDocuments.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Select at least one required document",
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() {
       isUpdating = true;
     });
@@ -365,7 +386,7 @@ class _EditScholarshipScreenState
         selectionProcessController.text.trim(),
 
         "requiredDocuments":
-        documentController.text.trim(),
+        selectedDocuments,
 
         "lastDate":
         Timestamp.fromDate(lastDate!),
@@ -619,6 +640,134 @@ class _EditScholarshipScreenState
         ),
       ],
     );
+  }
+
+  /// Required Documents chip selector: standard options + any custom
+  /// document names added via the "+ Add other" dialog, which are shown
+  /// as their own (always-selected) chips since they aren't in
+  /// [documentOptions].
+  Widget _buildDocumentSelector() {
+    final customDocs = selectedDocuments
+        .where((doc) => !documentOptions.contains(doc))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.description_outlined, size: 18, color: AppColors.textSecondary),
+            const SizedBox(width: 8),
+            Text("Required Documents", style: AppTextStyles.subtitle.copyWith(fontSize: 13)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ...documentOptions.map((doc) {
+              final bool isSelected = selectedDocuments.contains(doc);
+
+              return FilterChip(
+                label: Text(doc),
+                selected: isSelected,
+                onSelected: (bool value) {
+                  setState(() {
+                    if (value) {
+                      selectedDocuments.add(doc);
+                    } else {
+                      selectedDocuments.remove(doc);
+                    }
+                  });
+                },
+                selectedColor: AppColors.primary.withOpacity(0.15),
+                checkmarkColor: AppColors.primary,
+                labelStyle: TextStyle(
+                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                    color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                  ),
+                ),
+                backgroundColor: Colors.white,
+              );
+            }),
+
+            ...customDocs.map((doc) {
+              return FilterChip(
+                label: Text(doc),
+                selected: true,
+                onSelected: (_) {
+                  setState(() {
+                    selectedDocuments.remove(doc);
+                  });
+                },
+                selectedColor: AppColors.primary.withOpacity(0.15),
+                checkmarkColor: AppColors.primary,
+                labelStyle: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(color: AppColors.primary),
+                ),
+                backgroundColor: Colors.white,
+              );
+            }),
+
+            ActionChip(
+              avatar: const Icon(Icons.add, size: 16),
+              label: const Text("Add other"),
+              onPressed: _showAddDocumentDialog,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: Colors.grey.shade300),
+              ),
+              backgroundColor: Colors.white,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showAddDocumentDialog() async {
+    final controller = TextEditingController();
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Add Document"),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: "e.g. Migration Certificate",
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text("Add"),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty && !selectedDocuments.contains(result)) {
+      setState(() {
+        selectedDocuments.add(result);
+      });
+    }
   }
 
   // =========================================================
@@ -944,23 +1093,7 @@ class _EditScholarshipScreenState
               // REQUIRED DOCUMENTS
               // =================================================
 
-              _field(
-                controller:
-                documentController,
-                label: "Required Documents",
-                icon:
-                Icons.description_outlined,
-                maxLines: 2,
-                validator: (value) {
-                  if (value == null ||
-                      value.trim().isEmpty) {
-                    return
-                      "Enter Required Documents";
-                  }
-
-                  return null;
-                },
-              ),
+              _buildDocumentSelector(),
 
               const SizedBox(height: 20),
 
@@ -1093,7 +1226,6 @@ class _EditScholarshipScreenState
     descriptionController.dispose();
     amountController.dispose();
     eligibilityController.dispose();
-    documentController.dispose();
 
     minimumPercentageController.dispose();
     maximumIncomeController.dispose();

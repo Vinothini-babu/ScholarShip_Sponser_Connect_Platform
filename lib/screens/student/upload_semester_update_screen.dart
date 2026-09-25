@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../services/storage_service.dart';
 
 /// Lets a student, after completing a semester, upload that semester's
 /// marksheet + marks percentage so the sponsor can review it and continue
@@ -22,9 +23,7 @@ import '../../core/constants/app_text_styles.dart';
 ///     semesterUpdates/{semesterNumber}   <- subcollection, one doc per
 ///       semesterNumber   -> int
 ///       marksPercentage  -> num
-///       marksheetUrl     -> String (local file path for now — same
-///                           limitation as the rest of the app until
-///                           Firebase Storage upload is wired in)
+///       marksheetUrl     -> String (Firebase Storage download URL)
 ///       submittedAt      -> Timestamp
 ///       status           -> "Pending" | "Approved" | "Rejected"
 ///       sponsorRemarks   -> String
@@ -44,6 +43,7 @@ class _UploadSemesterUpdateScreenState extends State<UploadSemesterUpdateScreen>
 
   PlatformFile? _pickedFile;
   bool _isSubmitting = false;
+  bool _isUploading = false;
 
   // Same validation vocabulary used elsewhere in the app
   // (upload_documents_screen.dart / scholarship_application_screen.dart) —
@@ -169,6 +169,24 @@ class _UploadSemesterUpdateScreenState extends State<UploadSemesterUpdateScreen>
     try {
       final marks = double.parse(_marksController.text.trim());
 
+      final localPath = _pickedFile!.path;
+      if (localPath == null || localPath.isEmpty) {
+        throw Exception("Unable to read the selected file");
+      }
+
+      final ext = _pickedFile!.name.contains('.') ? _pickedFile!.name.split('.').last : 'pdf';
+
+      setState(() => _isUploading = true);
+      // Upload to Firebase Storage first — the sponsor's "View" button
+      // opens this URL, so a local device path here would leave them
+      // with nothing openable.
+      final marksheetUrl = await StorageService.uploadFile(
+        file: File(localPath),
+        folder: "applications/${widget.applicationId}/semesterUpdates",
+        fileName: StorageService.buildFileName("semester_$semesterNumber", ext),
+      );
+      setState(() => _isUploading = false);
+
       await FirebaseFirestore.instance
           .collection("applications")
           .doc(widget.applicationId)
@@ -177,7 +195,7 @@ class _UploadSemesterUpdateScreenState extends State<UploadSemesterUpdateScreen>
           .set({
         "semesterNumber": semesterNumber,
         "marksPercentage": marks,
-        "marksheetUrl": _pickedFile!.path ?? "",
+        "marksheetUrl": marksheetUrl,
         "submittedAt": Timestamp.now(),
         "status": "Pending",
         "sponsorRemarks": "",
@@ -192,7 +210,12 @@ class _UploadSemesterUpdateScreenState extends State<UploadSemesterUpdateScreen>
       if (!mounted) return;
       _showError("Something went wrong while submitting. Please try again.");
     } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _isUploading = false;
+        });
+      }
     }
   }
 
@@ -349,9 +372,16 @@ class _UploadSemesterUpdateScreenState extends State<UploadSemesterUpdateScreen>
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: _isSubmitting
-                  ? const SizedBox(
-                width: 22, height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                  ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(_isUploading ? "Uploading marksheet..." : "Submitting..."),
+                ],
               )
                   : const Text("Submit for Review"),
             ),

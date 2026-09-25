@@ -10,6 +10,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../models/application_model.dart';
 import '../../../services/application_service.dart';
+import '../../../services/storage_service.dart';
 
 /// Dedicated "fill in your application" screen. Reached by tapping
 /// "Apply Now" on a scholarship (from the Eligible Scholarships list, or
@@ -50,6 +51,10 @@ class _ScholarshipApplicationScreenState extends State<ScholarshipApplicationScr
 
   bool _isPickingDocument = false;
   bool _isApplying = false;
+
+  // Shown under the submit button while documents are being uploaded to
+  // Firebase Storage, e.g. "Uploading Income Certificate (2/3)...".
+  String? _uploadProgressLabel;
 
   @override
   void dispose() {
@@ -272,6 +277,33 @@ class _ScholarshipApplicationScreenState extends State<ScholarshipApplicationScr
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception("Please login again");
 
+      // Upload every picked document to Firebase Storage first — Firestore
+      // must store a URL the sponsor can actually open, not a path that
+      // only exists on this device.
+      final Map<String, String> uploadedDocuments = {};
+      final documentEntries = _documents.entries.toList();
+
+      for (int i = 0; i < documentEntries.length; i++) {
+        final entry = documentEntries[i];
+        final localPath = entry.value;
+        final extension = localPath.contains('.') ? localPath.split('.').last : 'pdf';
+
+        setState(() {
+          _uploadProgressLabel =
+          "Uploading ${entry.key} (${i + 1}/${documentEntries.length})...";
+        });
+
+        final url = await StorageService.uploadFile(
+          file: File(localPath),
+          folder: "applications/${user.uid}/${widget.scholarshipId}",
+          fileName: StorageService.buildFileName(entry.key, extension),
+        );
+
+        uploadedDocuments[entry.key] = url;
+      }
+
+      setState(() => _uploadProgressLabel = null);
+
       final firestore = FirebaseFirestore.instance;
 
       final studentSnapshot = await firestore.collection("users").doc(user.uid).get();
@@ -336,8 +368,9 @@ class _ScholarshipApplicationScreenState extends State<ScholarshipApplicationScr
         appliedAt: Timestamp.now(),
         // Keyed by the actual document name (e.g. "Income Certificate")
         // rather than a fixed internal key, matching what the sponsor's
-        // review screen expects.
-        documents: _documents,
+        // review screen expects. Values are Firebase Storage download
+        // URLs (uploaded just above), not local file paths.
+        documents: uploadedDocuments,
       );
 
       final result = await _applicationService.applyScholarship(application);
@@ -388,7 +421,12 @@ class _ScholarshipApplicationScreenState extends State<ScholarshipApplicationScr
         SnackBar(content: Text("Unable to apply: $e")),
       );
     } finally {
-      if (mounted) setState(() => _isApplying = false);
+      if (mounted) {
+        setState(() {
+          _isApplying = false;
+          _uploadProgressLabel = null;
+        });
+      }
     }
   }
 
@@ -676,6 +714,16 @@ class _ScholarshipApplicationScreenState extends State<ScholarshipApplicationScr
                 ),
               ),
             ),
+
+            if (_uploadProgressLabel != null) ...[
+              const SizedBox(height: 10),
+              Center(
+                child: Text(
+                  _uploadProgressLabel!,
+                  style: AppTextStyles.subtitle.copyWith(fontSize: 12.5, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 24),
           ],
