@@ -1,13 +1,8 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_text_styles.dart';
 import '../../services/auth_service.dart';
-import '../../widgets/app_logo.dart';
-import 'terms_conditions_screen.dart';
-import 'privacy_policy_screen.dart';
 
 class SponsorSignupScreen extends StatefulWidget {
   const SponsorSignupScreen({super.key});
@@ -17,433 +12,631 @@ class SponsorSignupScreen extends StatefulWidget {
 }
 
 class _SponsorSignupScreenState extends State<SponsorSignupScreen> {
-  // ---- Contact & organization ----
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController organizationController = TextEditingController();
-  final TextEditingController registrationController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController mobileController = TextEditingController();
-  final TextEditingController districtController = TextEditingController();
+  // ------------------------------------------------------------
+  // Controllers
+  // ------------------------------------------------------------
 
-  // ---- Account security ----
-  final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
 
-  final AuthService _authService = AuthService();
+  final TextEditingController organizationController =
+  TextEditingController();
 
-  String? _selectedState;
-  PlatformFile? _proofDocument;
+  final TextEditingController registrationController =
+  TextEditingController();
+
+  final TextEditingController districtController =
+  TextEditingController();
+
+  final TextEditingController contactNameController =
+  TextEditingController();
+
+  final TextEditingController emailController =
+  TextEditingController();
+
+  final TextEditingController mobileController =
+  TextEditingController();
+
+  final TextEditingController passwordController =
+  TextEditingController();
+
+  final TextEditingController confirmPasswordController =
+  TextEditingController();
+
+  // ------------------------------------------------------------
+  // State
+  // ------------------------------------------------------------
+
+  String? selectedState;
+
+  PlatformFile? registrationCertificate;
 
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
-  bool _isLoading = false;
-  bool _agreedToTerms = false;
 
-  final List<String> _stateOptions = [
-    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa",
-    "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala",
-    "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland",
-    "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
-    "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands",
-    "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi",
-    "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry",
+  bool agreeToTerms = false;
+
+  bool isLoading = false;
+
+  // ------------------------------------------------------------
+  // Constants
+  // ------------------------------------------------------------
+
+  static const Color primaryColor = Color(0xFF1F3764);
+  static const Color primaryDark = Color(0xFF182D54);
+
+  static const Color pageBackground = Color(0xFFF8FAFC);
+
+  static const Color fieldBackground = Colors.white;
+
+  static const Color borderColor = Color(0xFFE2E8F0);
+
+  static const Color textPrimary = Color(0xFF172554);
+
+  static const Color textSecondary = Color(0xFF64748B);
+
+  static const Color iconBackground = Color(0xFFEAF0FB);
+
+  final List<String> states = const [
+    'Tamil Nadu',
+    'Kerala',
+    'Karnataka',
+    'Andhra Pradesh',
+    'Telangana',
+    'Puducherry',
+    'Maharashtra',
+    'Delhi',
+    'Other',
   ];
 
-  // Same document-validation vocabulary used across the app's upload
-  // screens (upload_documents_screen.dart / scholarship_application_screen.dart).
-  static const List<String> _allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png'];
-  static const int _minFileSizeBytes = 10 * 1024;
-  static const int _maxFileSizeBytes = 10 * 1024 * 1024;
-  static const List<String> _suspiciousNameKeywords = [
-    'test', 'sample', 'dummy', 'fake', 'temp', 'untitled',
-  ];
-  static const List<String> _screenshotNameKeywords = [
-    'screenshot', 'screen_shot', 'screenrecording', 'img_wa', 'snip', 'capture',
-  ];
+  // ------------------------------------------------------------
+  // Dispose
+  // ------------------------------------------------------------
 
   @override
   void dispose() {
-    nameController.dispose();
     organizationController.dispose();
     registrationController.dispose();
+    districtController.dispose();
+    contactNameController.dispose();
     emailController.dispose();
     mobileController.dispose();
-    districtController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
+
     super.dispose();
   }
 
-  Future<void> _pickProofDocument() async {
-    final file = await FilePicker.pickFile(
-      type: FileType.custom,
-      allowedExtensions: _allowedExtensions,
-    );
-    if (file == null) return;
+  // ------------------------------------------------------------
+  // File Picker
+  // ------------------------------------------------------------
 
-    final error = await _validateFile(file);
-    if (error != null) {
-      _showSnack(error, isError: true);
-      return;
+  Future<void> pickRegistrationCertificate() async {
+    try {
+      final PlatformFile? file = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: [
+          'pdf',
+          'jpg',
+          'jpeg',
+          'png',
+        ],
+      );
+
+      if (file != null) {
+        setState(() {
+          registrationCertificate = file;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Unable to select file: $e',
+          ),
+        ),
+      );
     }
-
-    setState(() => _proofDocument = file);
   }
 
-  Future<String?> _validateFile(PlatformFile file) async {
-    final name = file.name.toLowerCase();
-    final ext = name.contains('.') ? name.split('.').last : '';
+  // ------------------------------------------------------------
+  // Create Sponsor Account
+  // ------------------------------------------------------------
 
-    if (!_allowedExtensions.contains(ext)) {
-      return "Only PDF, JPG or PNG files are accepted.";
-    }
+  Future<void> createSponsorAccount() async {
+    FocusScope.of(context).unfocus();
 
-    final int size = file.lengthSync() ?? await file.length() ?? 0;
-
-    if (size < _minFileSizeBytes) {
-      return "This file looks too small to be a real document. Please upload the original.";
-    }
-    if (size > _maxFileSizeBytes) {
-      return "File is too large (max 10 MB). Please upload a smaller scan or photo.";
-    }
-    if (_suspiciousNameKeywords.any((k) => name.contains(k))) {
-      return "This file name looks like a placeholder. Please upload your actual registration certificate.";
-    }
-    if (_screenshotNameKeywords.any((k) => name.contains(k))) {
-      return "Screenshots aren't accepted. Please upload the original document file.";
-    }
-    return null;
-  }
-
-  void _showSnack(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: isError ? AppColors.error : null,
-        content: Text(message),
-      ),
-    );
-  }
-
-  Future<void> _handleSignup() async {
-    if (nameController.text.isEmpty ||
-        organizationController.text.isEmpty ||
-        registrationController.text.isEmpty ||
-        emailController.text.isEmpty ||
-        mobileController.text.isEmpty ||
-        _selectedState == null ||
-        districtController.text.isEmpty ||
-        passwordController.text.isEmpty ||
-        confirmPasswordController.text.isEmpty) {
-      _showSnack("Please fill all fields", isError: true);
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    if (_proofDocument == null) {
-      _showSnack("Please upload your registration certificate", isError: true);
+    if (selectedState == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select your state.'),
+        ),
+      );
       return;
     }
 
-    if (passwordController.text != confirmPasswordController.text) {
-      _showSnack("Passwords do not match", isError: true);
+    if (!agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please agree to the Terms & Conditions and Privacy Policy.',
+          ),
+        ),
+      );
       return;
     }
 
-    if (!_agreedToTerms) {
-      _showSnack("Please accept the Terms & Conditions to continue", isError: true);
-      return;
-    }
-
-    setState(() => _isLoading = true);
+    setState(() {
+      isLoading = true;
+    });
 
     try {
-      // NOTE: proof document is stored as a local file path for now — same
-      // limitation as the student apply flow, until Firebase Storage
-      // upload is wired in across the app.
-      await _authService.signUp(
-        name: nameController.text.trim(),
-        email: emailController.text.trim(),
+      // ==========================================================
+      // FIREBASE SPONSOR ACCOUNT CREATION
+      // ==========================================================
+
+      final AuthService authService = AuthService();
+
+      await authService.signUp(
+        name: contactNameController.text.trim(),
+        email: emailController.text.trim().replaceFirst(
+          RegExp(r'^mailto:', caseSensitive: false),
+          '',
+        ),
         mobile: mobileController.text.trim(),
-        password: passwordController.text.trim(),
-        role: "sponsor",
-        state: _selectedState,
+        password: passwordController.text,
+        role: 'sponsor',
+        state: selectedState!,
         district: districtController.text.trim(),
         organizationName: organizationController.text.trim(),
         registrationNumber: registrationController.text.trim(),
-        proofDocumentUrl: _proofDocument!.path ?? "",
+        proofDocumentUrl: registrationCertificate?.path ?? '',
       );
 
       if (!mounted) return;
-      _showSnack("Sponsor account created successfully");
-      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Colors.green,
+          content: Text(
+            'Sponsor account created successfully.',
+          ),
+        ),
+      );
+
+      // Firebase signUp leaves the newly-created user signed in.
+      // Sign out so the sponsor can use the normal Login screen.
+      await FirebaseAuth.instance.signOut();
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      _showSnack(e.toString(), isError: true);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
 
-  InputDecoration _fieldDecoration({
-    required String hint,
-    required IconData icon,
-    Widget? suffixIcon,
-  }) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: AppTextStyles.subtitle.copyWith(fontSize: 15.5),
-      prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 22),
-      suffixIcon: suffixIcon,
-      filled: true,
-      fillColor: AppColors.card,
-      contentPadding: const EdgeInsets.symmetric(vertical: 19, horizontal: 4),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.15)),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.15)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: AppColors.secondary, width: 1.6),
-      ),
-    );
-  }
-
-  /// Lays two fields side by side on wide screens, stacked on narrow ones.
-  Widget _pair(bool isWide, Widget a, Widget b) {
-    if (isWide) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [Expanded(child: a), const SizedBox(width: 16), Expanded(child: b)],
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Something went wrong: $e',
+          ),
+        ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
-    return Column(children: [a, const SizedBox(height: 16), b]);
   }
+
+  // ------------------------------------------------------------
+  // Build
+  // ------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: pageBackground,
       body: LayoutBuilder(
         builder: (context, constraints) {
-          // Wide (desktop) — split layout: gradient logo/intro panel on the
-          // left, scrollable form on the right. Narrow (mobile) — falls
-          // back to the original stacked header-then-form layout.
-          final bool isSplit = constraints.maxWidth > 900;
+          final bool isDesktop = constraints.maxWidth >= 900;
 
-          if (isSplit) return _buildSplitLayout(context);
-          return _buildStackedLayout(context);
+          if (isDesktop) {
+            return _buildDesktopLayout();
+          }
+
+          return _buildMobileLayout();
         },
       ),
     );
   }
 
-  // ==============================
-  // WIDE / DESKTOP — split layout
-  // ==============================
-  Widget _buildSplitLayout(BuildContext context) {
+  // ============================================================
+  // DESKTOP LAYOUT
+  // ============================================================
+
+  Widget _buildDesktopLayout() {
     return Row(
       children: [
-        // Left — static gradient panel with logo + intro copy
+        // --------------------------------------------------------
+        // LEFT BRANDING PANEL
+        // --------------------------------------------------------
+
         Expanded(
-          flex: 5,
-          child: Container(
-            height: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.primary, AppColors.primary.withOpacity(0.88)],
+          flex: 42,
+          child: _buildBrandingPanel(),
+        ),
+
+        // --------------------------------------------------------
+        // RIGHT FORM PANEL
+        // --------------------------------------------------------
+
+        Expanded(
+          flex: 58,
+          child: _buildDesktopFormPanel(),
+        ),
+      ],
+    );
+  }
+
+  // ============================================================
+  // MOBILE LAYOUT
+  // ============================================================
+
+  Widget _buildMobileLayout() {
+    return SafeArea(
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildMobileBranding(),
+
+            _buildMobileFormPanel(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // DESKTOP BRANDING
+  // ============================================================
+
+  Widget _buildBrandingPanel() {
+    return Container(
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        color: primaryColor,
+      ),
+      child: Stack(
+        children: [
+          // Decorative circle - top right
+          Positioned(
+            top: -120,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.06),
               ),
             ),
-            child: Stack(
-              clipBehavior: Clip.hardEdge,
+          ),
+
+          // Decorative circle - bottom left
+          Positioned(
+            bottom: -140,
+            left: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.06),
+              ),
+            ),
+          ),
+
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 40,
+                vertical: 40,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 620,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildLogo(
+                      size: 150,
+                      showWhiteContainer: true,
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    const Text(
+                      'Scholarship Sponsor\nConnect',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        height: 1.15,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    const Text(
+                      'Partner with us to support\nthe next generation of achievers.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFFDCE6F8),
+                        fontSize: 16,
+                        height: 1.5,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+
+                    const SizedBox(height: 45),
+
+                    _buildBenefitCard(
+                      icon: Icons.school_rounded,
+                      title: 'Support Students',
+                      description:
+                      'Help deserving students continue their education.',
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    _buildBenefitCard(
+                      icon: Icons.volunteer_activism_rounded,
+                      title: 'Create Opportunities',
+                      description:
+                      'Provide meaningful scholarship opportunities.',
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    _buildBenefitCard(
+                      icon: Icons.track_changes_rounded,
+                      title: 'Make an Impact',
+                      description:
+                      'Track scholarships and applications easily.',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // MOBILE BRANDING
+  // ============================================================
+
+  Widget _buildMobileBranding() {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: primaryColor,
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -100,
+            right: -80,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.06),
+              ),
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              24,
+              34,
+              24,
+              32,
+            ),
+            child: Column(
               children: [
-                // Decorative circles — same treatment as splash_screen.dart,
-                // so this feels like a continuation of the same identity.
-                Positioned(
-                  top: -90,
-                  right: -110,
-                  child: Container(
-                    width: 300,
-                    height: 300,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.secondary.withOpacity(0.12),
-                    ),
-                  ),
+                _buildLogo(
+                  size: 105,
+                  showWhiteContainer: true,
                 ),
-                Positioned(
-                  bottom: -100,
-                  left: -110,
-                  child: Container(
-                    width: 260,
-                    height: 260,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.05),
-                    ),
+
+                const SizedBox(height: 18),
+
+                const Text(
+                  'Scholarship Sponsor Connect',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 25,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
 
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 44),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.12),
-                                blurRadius: 24,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
-                          ),
-                          child: const AppLogo(size: 120),
-                        ),
-                        const SizedBox(height: 36),
-                        Text(
-                          "Sponsor Sign Up",
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.heading.copyWith(fontSize: 40, color: Colors.white),
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          "Partner with Scholarship Sponsor Connect",
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.subtitle.copyWith(
-                            color: Colors.white.withOpacity(0.85),
-                            fontSize: 19,
-                          ),
-                        ),
+                const SizedBox(height: 8),
 
-                        const SizedBox(height: 56),
-                        Text(
-                          "\"Empower ambition — fund the next\ngeneration of achievers.\"",
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.subtitle.copyWith(
-                            color: Colors.white.withOpacity(0.7),
-                            fontStyle: FontStyle.italic,
-                            fontSize: 17,
-                            height: 1.6,
-                          ),
-                        ),
-                      ],
-                    ),
+                const Text(
+                  'Partner with us to support the next generation of achievers.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFFDCE6F8),
+                    fontSize: 14,
+                    height: 1.45,
                   ),
                 ),
               ],
             ),
           ),
-        ),
-
-        // Right — scrollable form, vertically centered when it's shorter
-        // than the viewport (plain Center inside a SingleChildScrollView
-        // doesn't do this on its own — needs a bounded-minHeight wrapper).
-        Expanded(
-          flex: 5,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 760),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 56),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: _buildFormFields(true),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  // ==============================
-  // NARROW / MOBILE — stacked layout (original)
-  // ==============================
-  Widget _buildStackedLayout(BuildContext context) {
-    final size = MediaQuery.of(context).size;
+  // ============================================================
+  // LOGO
+  // ============================================================
 
-    return SingleChildScrollView(
+  Widget _buildLogo({
+    required double size,
+    required bool showWhiteContainer,
+  }) {
+    final Widget logo = Image.asset(
+      'assets/images/logo.png',
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      errorBuilder: (
+          context,
+          error,
+          stackTrace,
+          ) {
+        return Icon(
+          Icons.school_rounded,
+          size: size * 0.55,
+          color: primaryColor,
+        );
+      },
+    );
+
+    if (!showWhiteContainer) {
+      return logo;
+    }
+
+    return Container(
+      width: size + 28,
+      height: size + 28,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 25,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: logo,
+    );
+  }
+
+  // ============================================================
+  // BENEFIT CARD
+  // ============================================================
+
+  Widget _buildBenefitCard({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.075),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.12),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.13),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+
+          const SizedBox(width: 15),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                Text(
+                  description,
+                  style: const TextStyle(
+                    color: Color(0xFFD1DCF0),
+                    fontSize: 12.5,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // DESKTOP FORM PANEL
+  // ============================================================
+
+  Widget _buildDesktopFormPanel() {
+    return Container(
+      height: double.infinity,
+      color: pageBackground,
       child: Column(
         children: [
-          // Navy gradient header — matches login/splash/role screens
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 26, 24, 30),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppColors.primary, AppColors.primary.withOpacity(0.88)],
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(32),
-                    bottomRight: Radius.circular(32),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                      child: const AppLogo(size: 48),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      "Sponsor Sign Up",
-                      style: AppTextStyles.heading.copyWith(fontSize: 24, color: Colors.white),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Partner with Scholarship Sponsor Connect",
-                      style: AppTextStyles.subtitle.copyWith(color: Colors.white.withOpacity(0.8)),
-                    ),
-                  ],
-                ),
-              ),
-              Positioned(
-                top: -size.width * 0.15,
-                right: -size.width * 0.18,
-                child: Container(
-                  width: size.width * 0.5,
-                  height: size.width * 0.5,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: AppColors.secondary.withOpacity(0.10)),
-                ),
-              ),
-            ],
-          ),
+          _buildFormHeader(),
 
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 760),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: _buildFormFields(false),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(
+                52,
+                28,
+                52,
+                40,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 760,
+                  ),
+                  child: _buildSignupForm(),
                 ),
               ),
             ),
@@ -453,287 +646,776 @@ class _SponsorSignupScreenState extends State<SponsorSignupScreen> {
     );
   }
 
-  // ==============================
-  // Shared form fields — used by both layouts above
-  // ==============================
-  List<Widget> _buildFormFields(bool isWide) {
-    return [
-      // ==============================
-      // ORGANIZATION DETAILS
-      // ==============================
-      _SectionHeader(icon: Icons.apartment_rounded, title: "Organization Details"),
-      const SizedBox(height: 16),
+  // ============================================================
+  // MOBILE FORM PANEL
+  // ============================================================
 
-      TextField(
-        controller: organizationController,
-        style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-        decoration: _fieldDecoration(
-            hint: "Organization / Trust Name", icon: Icons.apartment_rounded),
+  Widget _buildMobileFormPanel() {
+    return Container(
+      width: double.infinity,
+      color: pageBackground,
+      padding: const EdgeInsets.fromLTRB(
+        20,
+        24,
+        20,
+        40,
       ),
-      const SizedBox(height: 16),
+      child: _buildSignupForm(),
+    );
+  }
 
-      TextField(
-        controller: registrationController,
-        style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-        decoration: _fieldDecoration(
-            hint: "Registration / PAN Number", icon: Icons.badge_outlined),
+  // ============================================================
+  // FORM HEADER
+  // ============================================================
+
+  Widget _buildFormHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        42,
+        22,
+        42,
+        18,
       ),
-      const SizedBox(height: 16),
-
-      _pair(
-        isWide,
-        DropdownButtonFormField<String>(
-          value: _selectedState,
-          isExpanded: true,
-          icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
-          style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-          decoration: _fieldDecoration(hint: "State", icon: Icons.map_outlined),
-          items: _stateOptions.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-          onChanged: (value) => setState(() => _selectedState = value),
-        ),
-        TextField(
-          controller: districtController,
-          style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-          decoration:
-          _fieldDecoration(hint: "District / City", icon: Icons.location_city_outlined),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: borderColor,
+          ),
         ),
       ),
-      const SizedBox(height: 16),
-
-      // Proof document upload
-      InkWell(
-        onTap: _pickProofDocument,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: _proofDocument != null
-                  ? AppColors.success
-                  : AppColors.textSecondary.withOpacity(0.15),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: () {
+              Navigator.of(context).pop();
+            },
+            borderRadius: BorderRadius.circular(10),
+            child: const Padding(
+              padding: EdgeInsets.all(7),
+              child: Icon(
+                Icons.arrow_back_rounded,
+                color: primaryColor,
+                size: 25,
+              ),
             ),
           ),
-          child: Row(
+
+          const SizedBox(width: 14),
+
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                _proofDocument != null
-                    ? Icons.check_circle_rounded
-                    : Icons.upload_file_rounded,
-                color: _proofDocument != null ? AppColors.success : AppColors.primary,
-                size: 21,
+              Text(
+                'Create Sponsor Account',
+                style: TextStyle(
+                  color: textPrimary,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  _proofDocument?.name ?? "Upload Registration Certificate (PDF, JPG, PNG)",
-                  style: AppTextStyles.subtitle.copyWith(fontSize: 14),
-                  overflow: TextOverflow.ellipsis,
+
+              SizedBox(height: 3),
+
+              Text(
+                'Register your organization to provide scholarship opportunities.',
+                style: TextStyle(
+                  color: textSecondary,
+                  fontSize: 12.5,
                 ),
               ),
             ],
           ),
-        ),
-      ),
-
-      const SizedBox(height: 34),
-
-      // ==============================
-      // CONTACT PERSON
-      // ==============================
-      _SectionHeader(icon: Icons.person_outline_rounded, title: "Contact Person"),
-      const SizedBox(height: 16),
-
-      TextField(
-        controller: nameController,
-        style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-        decoration: _fieldDecoration(hint: "Contact Person Name", icon: Icons.person_outline_rounded),
-      ),
-      const SizedBox(height: 16),
-
-      _pair(
-        isWide,
-        TextField(
-          controller: emailController,
-          keyboardType: TextInputType.emailAddress,
-          style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-          decoration: _fieldDecoration(hint: "Email Address", icon: Icons.email_outlined),
-        ),
-        TextField(
-          controller: mobileController,
-          keyboardType: TextInputType.phone,
-          style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-          decoration: _fieldDecoration(hint: "Mobile Number", icon: Icons.phone_outlined),
-        ),
-      ),
-
-      const SizedBox(height: 34),
-
-      // ==============================
-      // ACCOUNT SECURITY
-      // ==============================
-      _SectionHeader(icon: Icons.lock_outline_rounded, title: "Account Security"),
-      const SizedBox(height: 16),
-
-      _pair(
-        isWide,
-        TextField(
-          controller: passwordController,
-          obscureText: obscurePassword,
-          style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-          decoration: _fieldDecoration(
-            hint: "Password",
-            icon: Icons.lock_outline_rounded,
-            suffixIcon: IconButton(
-              icon: Icon(
-                obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                color: AppColors.textSecondary,
-                size: 20,
-              ),
-              onPressed: () => setState(() => obscurePassword = !obscurePassword),
-            ),
-          ),
-        ),
-        TextField(
-          controller: confirmPasswordController,
-          obscureText: obscureConfirmPassword,
-          style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 15),
-          decoration: _fieldDecoration(
-            hint: "Confirm Password",
-            icon: Icons.lock_outline_rounded,
-            suffixIcon: IconButton(
-              icon: Icon(
-                obscureConfirmPassword
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                color: AppColors.textSecondary,
-                size: 20,
-              ),
-              onPressed: () =>
-                  setState(() => obscureConfirmPassword = !obscureConfirmPassword),
-            ),
-          ),
-        ),
-      ),
-
-      const SizedBox(height: 20),
-
-      // ==============================
-      // TERMS & CONDITIONS
-      // ==============================
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 24,
-            height: 24,
-            child: Checkbox(
-              value: _agreedToTerms,
-              activeColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-              onChanged: (value) => setState(() => _agreedToTerms = value ?? false),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _agreedToTerms = !_agreedToTerms),
-              child: RichText(
-                text: TextSpan(
-                  style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary, fontSize: 13),
-                  children: [
-                    const TextSpan(text: "I agree to the "),
-                    TextSpan(
-                      text: "Terms & Conditions",
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                        decoration: TextDecoration.underline,
-                      ),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const TermsConditionsScreen()),
-                        ),
-                    ),
-                    const TextSpan(text: " and "),
-                    TextSpan(
-                      text: "Privacy Policy",
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w700,
-                        decoration: TextDecoration.underline,
-                      ),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
-                        ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
         ],
       ),
-
-      const SizedBox(height: 26),
-
-      SizedBox(
-        width: double.infinity,
-        height: 54,
-        child: ElevatedButton(
-          onPressed: _isLoading ? null : _handleSignup,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          ),
-          child: _isLoading
-              ? const SizedBox(
-            height: 20, width: 20,
-            child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
-          )
-              : const Text("Create Sponsor Account",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        ),
-      ),
-
-      const SizedBox(height: 20),
-    ];
+    );
   }
-}
 
-// ==============================
-// SECTION HEADER — small label + divider, groups related fields
-// ==============================
-class _SectionHeader extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  const _SectionHeader({required this.icon, required this.title});
+  // ============================================================
+  // MAIN FORM
+  // ============================================================
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSignupForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ------------------------------------------------------
+          // ORGANIZATION
+          // ------------------------------------------------------
+
+          _buildSectionTitle(
+            icon: Icons.business_rounded,
+            title: 'Organization Details',
+          ),
+
+          const SizedBox(height: 16),
+
+          _buildTextField(
+            controller: organizationController,
+            label: 'Organization / Trust Name',
+            hint: 'Enter organization or trust name',
+            icon: Icons.business_rounded,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please enter organization name';
+              }
+
+              return null;
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          _buildTextField(
+            controller: registrationController,
+            label: 'Registration / PAN Number',
+            hint: 'Enter registration or PAN number',
+            icon: Icons.badge_rounded,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please enter registration / PAN number';
+              }
+
+              return null;
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          Row(
+            children: [
+              Expanded(
+                child: _buildStateDropdown(),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: _buildTextField(
+                  controller: districtController,
+                  label: 'District / City',
+                  hint: 'Enter district / city',
+                  icon: Icons.location_city_rounded,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Enter district / city';
+                    }
+
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          _buildFilePicker(),
+
+          const SizedBox(height: 30),
+
+          // ------------------------------------------------------
+          // CONTACT PERSON
+          // ------------------------------------------------------
+
+          _buildSectionTitle(
+            icon: Icons.person_rounded,
+            title: 'Contact Person',
+          ),
+
+          const SizedBox(height: 16),
+
+          _buildTextField(
+            controller: contactNameController,
+            label: 'Contact Person Name',
+            hint: 'Enter contact person name',
+            icon: Icons.person_outline_rounded,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please enter contact person name';
+              }
+
+              return null;
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  controller: emailController,
+                  label: 'Email Address',
+                  hint: 'Enter email address',
+                  icon: Icons.email_outlined,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Enter email';
+                    }
+
+                    final emailRegex = RegExp(
+                      r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$',
+                    );
+
+                    if (!emailRegex.hasMatch(value.trim())) {
+                      return 'Enter valid email';
+                    }
+
+                    return null;
+                  },
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: _buildTextField(
+                  controller: mobileController,
+                  label: 'Mobile Number',
+                  hint: 'Enter mobile number',
+                  icon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Enter mobile number';
+                    }
+
+                    if (value.trim().length != 10) {
+                      return 'Enter 10 digit number';
+                    }
+
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 30),
+
+          // ------------------------------------------------------
+          // ACCOUNT SECURITY
+          // ------------------------------------------------------
+
+          _buildSectionTitle(
+            icon: Icons.lock_rounded,
+            title: 'Account Security',
+          ),
+
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  controller: passwordController,
+                  label: 'Password',
+                  hint: 'Create password',
+                  icon: Icons.lock_outline_rounded,
+                  obscureText: obscurePassword,
+                  suffixIcon: IconButton(
+                    onPressed: () {
+                      setState(() {
+                        obscurePassword = !obscurePassword;
+                      });
+                    },
+                    icon: Icon(
+                      obscurePassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      size: 20,
+                      color: textSecondary,
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Enter password';
+                    }
+
+                    if (value.length < 6) {
+                      return 'Minimum 6 characters';
+                    }
+
+                    return null;
+                  },
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: _buildTextField(
+                  controller: confirmPasswordController,
+                  label: 'Confirm Password',
+                  hint: 'Re-enter password',
+                  icon: Icons.lock_outline_rounded,
+                  obscureText: obscureConfirmPassword,
+                  suffixIcon: IconButton(
+                    onPressed: () {
+                      setState(() {
+                        obscureConfirmPassword =
+                        !obscureConfirmPassword;
+                      });
+                    },
+                    icon: Icon(
+                      obscureConfirmPassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      size: 20,
+                      color: textSecondary,
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Confirm password';
+                    }
+
+                    if (value != passwordController.text) {
+                      return 'Passwords do not match';
+                    }
+
+                    return null;
+                  },
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // ------------------------------------------------------
+          // TERMS
+          // ------------------------------------------------------
+
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: Checkbox(
+                  value: agreeToTerms,
+                  activeColor: primaryColor,
+                  onChanged: (value) {
+                    setState(() {
+                      agreeToTerms = value ?? false;
+                    });
+                  },
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Wrap(
+                    children: [
+                      const Text(
+                        'I agree to the ',
+                        style: TextStyle(
+                          color: textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {},
+                        child: const Text(
+                          'Terms & Conditions',
+                          style: TextStyle(
+                            color: primaryColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                      const Text(
+                        ' and ',
+                        style: TextStyle(
+                          color: textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {},
+                        child: const Text(
+                          'Privacy Policy',
+                          style: TextStyle(
+                            color: primaryColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // ------------------------------------------------------
+          // CREATE ACCOUNT BUTTON
+          // ------------------------------------------------------
+
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed:
+              isLoading ? null : createSponsorAccount,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                disabledBackgroundColor:
+                primaryColor.withOpacity(0.65),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: isLoading
+                  ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  valueColor:
+                  AlwaysStoppedAnimation<Color>(
+                    Colors.white,
+                  ),
+                ),
+              )
+                  : const Row(
+                mainAxisAlignment:
+                MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.person_add_alt_1_rounded,
+                    size: 19,
+                  ),
+                  SizedBox(width: 9),
+                  Text(
+                    'Create Sponsor Account',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // SECTION TITLE
+  // ============================================================
+
+  Widget _buildSectionTitle({
+    required IconData icon,
+    required String title,
+  }) {
     return Row(
       children: [
         Container(
-          width: 30,
-          height: 30,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.10),
+            color: iconBackground,
             borderRadius: BorderRadius.circular(9),
           ),
-          child: Icon(icon, size: 16, color: AppColors.primary),
+          child: Icon(
+            icon,
+            size: 17,
+            color: primaryColor,
+          ),
         ),
+
         const SizedBox(width: 10),
-        Text(title, style: AppTextStyles.title.copyWith(fontSize: 15.5, fontWeight: FontWeight.w700)),
+
+        Text(
+          title,
+          style: const TextStyle(
+            color: textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+
         const SizedBox(width: 12),
-        Expanded(child: Divider(color: AppColors.textSecondary.withOpacity(0.15), thickness: 1)),
+
+        const Expanded(
+          child: Divider(
+            color: borderColor,
+            thickness: 1,
+          ),
+        ),
       ],
+    );
+  }
+
+  // ============================================================
+  // TEXT FIELD
+  // ============================================================
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    bool obscureText = false,
+    Widget? suffixIcon,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      validator: validator,
+      style: const TextStyle(
+        color: textPrimary,
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: const TextStyle(
+          color: textSecondary,
+          fontSize: 12,
+        ),
+        hintStyle: const TextStyle(
+          color: Color(0xFF94A3B8),
+          fontSize: 12,
+        ),
+        prefixIcon: Icon(
+          icon,
+          size: 19,
+          color: textSecondary,
+        ),
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: fieldBackground,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: borderColor,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: borderColor,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: primaryColor,
+            width: 1.4,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: Colors.redAccent,
+          ),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: Colors.redAccent,
+            width: 1.2,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ============================================================
+  // STATE DROPDOWN
+  // ============================================================
+
+  Widget _buildStateDropdown() {
+    return DropdownButtonFormField<String>(
+      value: selectedState,
+      decoration: InputDecoration(
+        labelText: 'State',
+        labelStyle: const TextStyle(
+          color: textSecondary,
+          fontSize: 12,
+        ),
+        prefixIcon: const Icon(
+          Icons.map_outlined,
+          size: 19,
+          color: textSecondary,
+        ),
+        filled: true,
+        fillColor: fieldBackground,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 4,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: borderColor,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: borderColor,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: primaryColor,
+            width: 1.4,
+          ),
+        ),
+      ),
+      icon: const Icon(
+        Icons.keyboard_arrow_down_rounded,
+        color: textSecondary,
+      ),
+      items: states.map(
+            (state) {
+          return DropdownMenuItem<String>(
+            value: state,
+            child: Text(
+              state,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: textPrimary,
+                fontSize: 13,
+              ),
+            ),
+          );
+        },
+      ).toList(),
+      onChanged: (value) {
+        setState(() {
+          selectedState = value;
+        });
+      },
+    );
+  }
+
+  // ============================================================
+  // FILE PICKER
+  // ============================================================
+
+  Widget _buildFilePicker() {
+    final bool hasFile =
+        registrationCertificate != null;
+
+    return InkWell(
+      onTap: pickRegistrationCertificate,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 13,
+        ),
+        decoration: BoxDecoration(
+          color: fieldBackground,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: hasFile
+                ? primaryColor.withOpacity(0.45)
+                : borderColor,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: iconBackground,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(
+                hasFile
+                    ? Icons.check_circle_rounded
+                    : Icons.upload_file_rounded,
+                color: hasFile
+                    ? Colors.green
+                    : primaryColor,
+                size: 20,
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    hasFile
+                        ? registrationCertificate!.name
+                        : 'Upload Registration Certificate',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: hasFile
+                          ? textPrimary
+                          : textSecondary,
+                      fontSize: 12.5,
+                      fontWeight: hasFile
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                    ),
+                  ),
+
+                  const SizedBox(height: 3),
+
+                  Text(
+                    hasFile
+                        ? 'Certificate selected successfully'
+                        : 'PDF, JPG or PNG',
+                    style: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 10.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Icon(
+              Icons.cloud_upload_outlined,
+              color: primaryColor,
+              size: 21,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
