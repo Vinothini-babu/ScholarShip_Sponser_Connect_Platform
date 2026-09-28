@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../services/application_service.dart';
 
 class ApplicationDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -76,22 +78,33 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
       if (!proceed) return;
     }
 
-    final Map<String, dynamic> updateData = {
-      "status": status,
-      "statusHistory": FieldValue.arrayUnion([
-        {"status": status, "timestamp": Timestamp.now()},
-      ]),
-    };
+    final sponsorId = FirebaseAuth.instance.currentUser?.uid;
+    if (sponsorId == null) return;
+
+    final Map<String, dynamic> extra = {};
 
     // First time this application is approved, initialize semester-renewal
     // tracking so the student's "Upload Next Semester Marks" screen and
     // this screen's "Semester Updates" section both have a starting point.
     if (status == "Approved" && currentData["currentSemester"] == null) {
-      updateData["currentSemester"] = 1;
-      updateData["scholarshipStatus"] = "Active";
+      extra["currentSemester"] = 1;
+      extra["scholarshipStatus"] = "Active";
     }
 
-    await FirebaseFirestore.instance.collection("applications").doc(widget.applicationId).update(updateData);
+    final error = await ApplicationService().setStatusWithAward(
+      applicationId: widget.applicationId,
+      status: status,
+      sponsorId: sponsorId,
+      studentId: (currentData["studentId"] ?? currentData["uid"])?.toString(),
+      scholarshipId: currentData["scholarshipId"]?.toString(),
+      extraAppFields: extra,
+      wasApproved: currentData["status"] == "Approved",
+    );
+
+    if (!mounted) return;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+    }
   }
 
   Future<bool> _confirmApproveWithoutVerification() async {
@@ -426,7 +439,11 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
                 final bool documentsVerified = data["documentsVerified"] == true;
                 final bool fieldVerified = data["fieldVerified"] == true;
                 final Map<String, dynamic> documents =
-                (data["documents"] is Map) ? Map<String, dynamic>.from(data["documents"]) : {};
+                (data["documents"] is Map)
+                    ? Map<String, dynamic>.from(data["documents"])
+                    : (data["documentPath"] is Map)
+                    ? Map<String, dynamic>.from(data["documentPath"])
+                    : {};
 
                 return SingleChildScrollView(
                   padding: const EdgeInsets.all(20),

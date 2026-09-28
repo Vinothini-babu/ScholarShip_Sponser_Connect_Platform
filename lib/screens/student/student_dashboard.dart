@@ -1,7 +1,7 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:scholarship_sponser_connect_platform/screens/sponser/applications/sponsor_applications_screen.dart';
 import 'package:scholarship_sponser_connect_platform/screens/sponser/applications/sponsor_applications_screen.dart';
 
 import '../../core/constants/app_colors.dart';
@@ -19,6 +19,7 @@ import 'eligible_scholarships_screen.dart';
 import 'scholarship_info_screen.dart';
 import 'upload_documents_screen.dart';
 import '../../utils/eligibility_utils.dart';
+import 'all_scholarships_screen.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -148,17 +149,39 @@ class _StudentDashboardState extends State<StudentDashboard> {
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  const _GradientHeader(userName: "Vino"),
+                  StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                    stream: FirebaseFirestore.instance
+                        .collection("users")
+                        .doc(FirebaseAuth.instance.currentUser?.uid)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      final data = snapshot.data?.data();
+                      String name = (data?["name"] ??
+                          data?["fullName"] ??
+                          data?["userName"] ??
+                          FirebaseAuth.instance.currentUser?.displayName ??
+                          "")
+                          .toString()
+                          .trim();
+                      if (name.isEmpty) name = "Student";
+                      return _GradientHeader(userName: name, profile: data);
+                    },
+                  ),
                   Positioned(
-                    bottom: -34,
+                    bottom: -46,
                     left: 20,
                     right: 20,
-                    child: const _PromoBanner(),
+                    child: _PromoBanner(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AllScholarshipsScreen()),
+                      ),
+                    ),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 45),
+              const SizedBox(height: 66),
 
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -172,7 +195,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 child: _SectionHeader(
                   title: "Trending Scholarships",
                   actionLabel: "See All",
-                  onAction: () {},
+                  onAction: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AllScholarshipsScreen()),
+                  ),
                 ),
               ),
 
@@ -185,6 +211,20 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return Center(child: CircularProgressIndicator(color: AppColors.primary));
+                    }
+
+                    if (snapshot.hasError) {
+                      debugPrint("❌ Trending scholarships error: ${snapshot.error}");
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Text(
+                            "Unable to load scholarships.\n\n${snapshot.error}",
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.subtitle.copyWith(color: AppColors.error, fontSize: 12),
+                          ),
+                        ),
+                      );
                     }
 
                     if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -354,57 +394,78 @@ class _TapFeedbackState extends State<_TapFeedback> {
 /// HEADER
 /// ------------------------------------------------------------
 
-class _GradientHeader extends StatelessWidget {
+class _GradientHeader extends StatefulWidget {
   final String userName;
+  final Map<String, dynamic>? profile;
 
-  const _GradientHeader({required this.userName});
+  const _GradientHeader({required this.userName, this.profile});
 
   @override
-  Widget build(BuildContext context) {
+  State<_GradientHeader> createState() => _GradientHeaderState();
+}
+
+class _GradientHeaderState extends State<_GradientHeader>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _loop;
+
+  @override
+  void initState() {
+    super.initState();
+    _loop = AnimationController(vsync: this, duration: const Duration(seconds: 6))
+      ..repeat();
+  }
+
+  @override
+  void dispose() {
+    _loop.dispose();
+    super.dispose();
+  }
+
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    return "Good evening";
+  }
+
+  /// first non-empty value among several possible Firestore keys
+  String _pick(List<String> keys) {
+    final p = widget.profile;
+    if (p == null) return "";
+    for (final k in keys) {
+      final v = (p[k] ?? "").toString().trim();
+      if (v.isNotEmpty) return v;
+    }
+    return "";
+  }
+
+  String _yearText() {
+    final y = _pick(["year", "currentYear", "studyYear", "yearOfStudy"]);
+    if (y.isEmpty) return "";
+    return RegExp(r'^\d+$').hasMatch(y) ? "Year $y" : y;
+  }
+
+  Widget _chip(IconData icon, String text) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 55),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary,
-            AppColors.primary.withValues(alpha: .85),
-          ],
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.22)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Hi, $userName 👋",
-                style: AppTextStyles.title.copyWith(
-                  color: Colors.white,
-                  fontSize: 22,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                "Let's find your next opportunity",
-                style: AppTextStyles.subtitle.copyWith(color: Colors.white70),
-              ),
-            ],
-          ),
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.secondary,
+          Icon(icon, size: 14, color: AppColors.secondary),
+          const SizedBox(width: 6),
+          Flexible(
             child: Text(
-              userName[0],
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+              text,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.subtitle.copyWith(
+                color: Colors.white.withOpacity(0.95),
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -412,64 +473,376 @@ class _GradientHeader extends StatelessWidget {
       ),
     );
   }
-}
 
-/// ------------------------------------------------------------
-/// PROMO CARD
-/// ------------------------------------------------------------
-
-class _PromoBanner extends StatelessWidget {
-  const _PromoBanner();
+  Widget _twinkle(double t, double phase,
+      {double? right, double? top, double? left, double? bottom, double size = 4}) {
+    final o = 0.15 + 0.5 * (0.5 + 0.5 * math.sin(t * 2 + phase));
+    return Positioned(
+      right: right,
+      top: top,
+      left: left,
+      bottom: bottom,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withOpacity(o),
+          boxShadow: [BoxShadow(color: Colors.white.withOpacity(o * 0.8), blurRadius: 6)],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: .15),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: AppColors.secondary.withValues(alpha: .15),
-              child: Icon(Icons.celebration, color: AppColors.secondary),
+    final gold = AppColors.secondary;
+    final name = widget.userName;
+
+    final course = _pick(["course", "department", "degree", "branch"]);
+    final year = _yearText();
+    final college = _pick(["college", "collegeName", "institution", "institute"]);
+    final district = _pick(["district", "city"]);
+    final state = _pick(["state"]);
+    final location = [district, state].where((e) => e.isNotEmpty).join(", ");
+    final courseLine = [course, year].where((e) => e.isNotEmpty).join(" • ");
+
+    return AnimatedBuilder(
+      animation: _loop,
+      builder: (context, _) {
+        final v = _loop.value;
+        final t = 2 * math.pi * v;
+        final drift = math.sin(t);
+        final drift2 = math.cos(t);
+        final pulse = 0.5 + 0.5 * math.sin(t * 3);
+
+        return Container(
+          width: double.infinity,
+          clipBehavior: Clip.antiAlias,
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 66),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment(-1 + 0.5 * drift, -1),
+              end: Alignment(1, 1 + 0.4 * drift2),
+              colors: [
+                AppColors.primary,
+                Color.lerp(AppColors.primary, gold, 0.16)!,
+                AppColors.primary.withOpacity(0.88),
+              ],
             ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(32),
+              bottomRight: Radius.circular(32),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.30),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                right: -30 + 14 * drift,
+                top: -40 + 10 * drift2,
+                child: Container(
+                  width: 150,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(colors: [
+                      Colors.white.withOpacity(0.12),
+                      Colors.white.withOpacity(0.03),
+                    ]),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 120 + 16 * drift2,
+                bottom: -60 + 8 * drift,
+                child: Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: gold.withOpacity(0.10)),
+                ),
+              ),
+              _twinkle(t, 0, right: 90, top: 34),
+              _twinkle(t, 1.6, right: 210, top: 78, size: 3),
+              _twinkle(t, 3.1, right: 40, bottom: 20, size: 5),
+
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "50+ New Scholarships",
-                    style: AppTextStyles.subtitle.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                  Row(
+                    children: [
+                      Text(
+                        "${_greeting()} ",
+                        style: AppTextStyles.subtitle.copyWith(
+                          color: Colors.white.withOpacity(0.88),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Transform.rotate(
+                        angle: 0.45 * math.sin(t * 4),
+                        alignment: Alignment.bottomRight,
+                        child: const Text("👋", style: TextStyle(fontSize: 15)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 900),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, e, child) => Opacity(
+                      opacity: e,
+                      child: Transform.translate(offset: Offset(-24 * (1 - e), 0), child: child),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 62,
+                          height: 62,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.18),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: gold.withOpacity(0.55 + 0.45 * pulse), width: 2.2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: gold.withOpacity(0.20 + 0.30 * pulse),
+                                blurRadius: 10 + 12 * pulse,
+                                spreadRadius: 1 + 2 * pulse,
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : "S",
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ShaderMask(
+                                blendMode: BlendMode.srcIn,
+                                shaderCallback: (rect) => LinearGradient(
+                                  begin: Alignment(-2 + 4 * v, 0),
+                                  end: Alignment(-1 + 4 * v, 0),
+                                  colors: const [Colors.white, Color(0xFFFFE7A0), Colors.white],
+                                ).createShader(rect),
+                                child: Text(
+                                  name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.title.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.4,
+                                    height: 1.1,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  if (courseLine.isNotEmpty)
+                                    _chip(Icons.menu_book_rounded, courseLine),
+                                  if (college.isNotEmpty)
+                                    _chip(Icons.account_balance_rounded, college),
+                                  if (location.isNotEmpty)
+                                    _chip(Icons.location_on_rounded, location),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text("Added this week", style: AppTextStyles.subtitle),
                 ],
               ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: AppColors.textSecondary,
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// ------------------------------------------------------------
+/// PROMO CARD  (live count of active scholarships, tap -> all)
+/// ------------------------------------------------------------
+
+class _PromoBanner extends StatefulWidget {
+  final VoidCallback onTap;
+  const _PromoBanner({required this.onTap});
+
+  @override
+  State<_PromoBanner> createState() => _PromoBannerState();
+}
+
+class _PromoBannerState extends State<_PromoBanner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))
+      ..repeat();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final gold = AppColors.secondary;
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection("scholarships")
+          .where("status", isEqualTo: "Active")
+          .snapshots(),
+      builder: (context, snap) {
+        final docs = snap.data?.docs ?? [];
+        final total = docs.length;
+        final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+        final newThisWeek = docs.where((d) {
+          final t = d.data()["createdAt"];
+          return t is Timestamp && t.toDate().isAfter(weekAgo);
+        }).length;
+
+        return AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) {
+            final v = _c.value;
+            final pulse = 0.5 + 0.5 * math.sin(2 * math.pi * v);
+
+            return InkWell(
+              onTap: widget.onTap,
+              borderRadius: BorderRadius.circular(22),
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: gold.withOpacity(0.35 + 0.35 * pulse)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: gold.withOpacity(0.18 + 0.22 * pulse),
+                      blurRadius: 16 + 12 * pulse,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    // light sweep
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment(-2.5 + 5 * v, -0.4),
+                              end: Alignment(-1.5 + 5 * v, 0.4),
+                              colors: [
+                                gold.withOpacity(0),
+                                gold.withOpacity(0.16),
+                                gold.withOpacity(0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [gold, Color.lerp(gold, Colors.deepOrange, 0.35)!],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: gold.withOpacity(0.25 + 0.30 * pulse),
+                                  blurRadius: 10 + 8 * pulse,
+                                ),
+                              ],
+                            ),
+                            child: Transform.scale(
+                              scale: 1 + 0.10 * pulse,
+                              child: const Icon(Icons.celebration_rounded, color: Colors.white, size: 26),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  snap.hasData
+                                      ? "$total Scholarships Available"
+                                      : "Loading scholarships...",
+                                  style: AppTextStyles.subtitle.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  newThisWeek > 0
+                                      ? "$newThisWeek added this week ✨ Tap to browse all"
+                                      : "Tap to browse all & check your eligibility",
+                                  style: AppTextStyles.subtitle.copyWith(fontSize: 12.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Transform.translate(
+                            offset: Offset(4 * pulse, 0),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: gold.withOpacity(0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.arrow_forward_rounded, size: 18, color: gold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -537,6 +910,9 @@ class _StatsGrid extends StatelessWidget {
             StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: scholarshipStream,
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  debugPrint("❌ Scholarships stat error: ${snapshot.error}");
+                }
                 final count =
                     snapshot.data?.docs.length ?? 0;
 
@@ -565,6 +941,9 @@ class _StatsGrid extends StatelessWidget {
             StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: applicationStream,
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  debugPrint("❌ Applications stat error: ${snapshot.error}");
+                }
                 final count =
                     snapshot.data?.docs.length ?? 0;
 
@@ -656,87 +1035,17 @@ class _StatsGrid extends StatelessWidget {
                       ) {
                     int eligibleCount = 0;
 
-                    if (userSnapshot.hasData &&
-                        userSnapshot.data!.exists) {
+                    if (userSnapshot.hasData && userSnapshot.data!.exists) {
+                      final userData = userSnapshot.data!.data() ?? {};
 
-                      final userData =
-                      userSnapshot.data!.data();
-
-                      final studentCourse =
-                      (userData?["course"] ?? "")
-                          .toString()
-                          .trim()
-                          .toLowerCase();
-
-                      final studentCategory =
-                      (userData?["category"] ?? "")
-                          .toString()
-                          .trim()
-                          .toLowerCase();
-
-                      final studentPercentage =
-                      _toDouble(
-                        userData?["percentage"],
-                      );
-
-                      final studentIncome =
-                      _toDouble(
-                        userData?["annualIncome"],
-                      );
-
-                      for (final doc
-                      in scholarshipDocs) {
-
-                        final data = doc.data();
-
-                        final requiredCourse =
-                        (data["eligibleCourse"] ??
-                            "")
-                            .toString()
-                            .trim()
-                            .toLowerCase();
-
-                        final requiredCategory =
-                        (data["eligibleCategory"] ??
-                            "")
-                            .toString()
-                            .trim()
-                            .toLowerCase();
-
-                        final minimumPercentage =
-                        _toDouble(
-                          data["minimumPercentage"],
-                        );
-
-                        final maximumIncome =
-                        _toDouble(
-                          data["maximumAnnualIncome"],
-                        );
-
-                        final courseOK =
-                            requiredCourse.isEmpty ||
-                                requiredCourse == "all" ||
-                                requiredCourse ==
-                                    studentCourse;
-
-                        final categoryOK =
-                            requiredCategory.isEmpty ||
-                                requiredCategory == "all" ||
-                                requiredCategory ==
-                                    studentCategory;
-
-                        final percentageOK =
-                            studentPercentage >=
-                                minimumPercentage;
-
-                        final incomeOK =
-                            studentIncome <=
-                                maximumIncome;
-
-                        if (courseOK &&
-                            categoryOK &&
-                            percentageOK &&
-                            incomeOK) {
+                      // Same shared logic used by the scholarship tap and
+                      // the Eligible screen, so counts always match and
+                      // List/String eligibleCourse values both work.
+                      for (final doc in scholarshipDocs) {
+                        if (isStudentEligibleForScholarship(
+                          doc.data(),
+                          userData,
+                        )) {
                           eligibleCount++;
                         }
                       }

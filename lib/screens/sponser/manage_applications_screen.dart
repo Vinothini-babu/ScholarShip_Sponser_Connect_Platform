@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../services/application_service.dart';
 
 class ManageApplicationsScreen extends StatelessWidget {
   const ManageApplicationsScreen({super.key});
@@ -24,15 +25,12 @@ class ManageApplicationsScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection("applications")
-            .where(
-          "sponsorId",
-          isEqualTo: FirebaseAuth.instance.currentUser!.uid,
-        )
-            .orderBy("appliedAt", descending: true)
-            .snapshots(),
+      body: StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+        // only THIS sponsor's applications, and students awarded by another
+        // sponsor are hidden (same filter as the dashboard)
+        stream: ApplicationService().getVisibleSponsorApplicationDocs(
+          FirebaseAuth.instance.currentUser!.uid,
+        ),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(
@@ -53,7 +51,7 @@ class ManageApplicationsScreen extends StatelessWidget {
             );
           }
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -75,7 +73,7 @@ class ManageApplicationsScreen extends StatelessWidget {
             );
           }
 
-          final docs = snapshot.data!.docs;
+          final docs = snapshot.data!;
 
           return ListView.builder(
             padding: const EdgeInsets.all(20),
@@ -110,15 +108,24 @@ class ManageApplicationsScreen extends StatelessWidget {
 
               Future<void> _updateStatus(String newStatus) async {
                 try {
-                  await FirebaseFirestore.instance
-                      .collection("applications")
-                      .doc(doc.id)
-                      .update({"status": newStatus});
+                  final error = await ApplicationService().setStatusWithAward(
+                    applicationId: doc.id,
+                    status: newStatus,
+                    sponsorId: FirebaseAuth.instance.currentUser!.uid,
+                    studentId: (application["studentId"] ?? application["uid"])?.toString(),
+                    scholarshipId: application["scholarshipId"]?.toString(),
+                    extraAppFields: (newStatus == "Approved" && application["currentSemester"] == null)
+                        ? {"currentSemester": 1, "scholarshipStatus": "Active"}
+                        : {},
+                    wasApproved: application["status"] == "Approved",
+                  );
 
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("$studentName $newStatus")),
+                    SnackBar(content: Text(error ?? "$studentName $newStatus")),
                   );
                 } catch (e) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(e.toString())),
                   );

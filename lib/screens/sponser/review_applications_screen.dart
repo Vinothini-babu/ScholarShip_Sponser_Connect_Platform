@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../services/application_service.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
@@ -31,6 +33,7 @@ class ReviewApplicationsScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection("applications")
+            .where("sponsorId", isEqualTo: FirebaseAuth.instance.currentUser?.uid)
             .where("status", isEqualTo: "Pending")
             .snapshots(),
 
@@ -223,14 +226,23 @@ class _ApplicationCard extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: () async {
 
-                    await FirebaseFirestore.instance
-                        .collection("applications")
-                        .doc(documentId)
-                        .update({
-                      "status": "Approved",
-                    });
+                    final error = await ApplicationService().setStatusWithAward(
+                      applicationId: documentId,
+                      status: "Approved",
+                      sponsorId: FirebaseAuth.instance.currentUser!.uid,
+                      studentId: (data["studentId"] ?? data["uid"])?.toString(),
+                      scholarshipId: data["scholarshipId"]?.toString(),
+                      extraAppFields: {},
+                      wasApproved: false,
+                    );
 
                     if (!context.mounted) return;
+
+                    if (error != null) {
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(SnackBar(content: Text(error)));
+                      return;
+                    }
 
                     ScaffoldMessenger.of(context)
                         .showSnackBar(
@@ -265,14 +277,23 @@ class _ApplicationCard extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: () async {
 
-                    await FirebaseFirestore.instance
-                        .collection("applications")
-                        .doc(documentId)
-                        .update({
-                      "status": "Rejected",
-                    });
+                    final error = await ApplicationService().setStatusWithAward(
+                      applicationId: documentId,
+                      status: "Rejected",
+                      sponsorId: FirebaseAuth.instance.currentUser!.uid,
+                      studentId: (data["studentId"] ?? data["uid"])?.toString(),
+                      scholarshipId: data["scholarshipId"]?.toString(),
+                      extraAppFields: {},
+                      wasApproved: false,
+                    );
 
                     if (!context.mounted) return;
+
+                    if (error != null) {
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(SnackBar(content: Text(error)));
+                      return;
+                    }
 
                     ScaffoldMessenger.of(context)
                         .showSnackBar(

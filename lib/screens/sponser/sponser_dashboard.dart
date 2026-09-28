@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,6 +10,8 @@ import 'manage_scholarship_screen.dart';
 import 'applications/sponsor_applications_screen.dart';
 import 'sponsor_profile_screen.dart';
 import 'dashboard/approved_students_screen.dart';
+import 'dashboard/student_suggestions.dart';
+import '../../services/application_service.dart';
 
 class SponsorDashboard extends StatefulWidget {
   const SponsorDashboard({super.key});
@@ -86,6 +89,10 @@ class _SponsorDashboardState extends State<SponsorDashboard>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Blinking suggestion / quote card
+                      _reveal(1, StudentSuggestionSection(sponsorId: uid)),
+                      const SizedBox(height: 28),
+
                       const _SectionTitle(title: "Quick Actions"),
                       const SizedBox(height: 16),
 
@@ -120,8 +127,7 @@ class _SponsorDashboardState extends State<SponsorDashboard>
                             gradient: [AppColors.success, AppColors.success.withOpacity(0.75)],
                             onTap: () => Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => SponsorApplicationsScreen()),
-                            ),
+                              MaterialPageRoute(builder: (_) => SponsorApplicationsScreen()),                            ),
                             ),
                             (
                             icon: Icons.person_rounded,
@@ -190,13 +196,10 @@ class _SponsorDashboardState extends State<SponsorDashboard>
                         builder: (context, scholarshipSnapshot) {
                           final totalScholarships = scholarshipSnapshot.data?.docs.length ?? 0;
 
-                          return StreamBuilder<QuerySnapshot>(
-                            stream: FirebaseFirestore.instance
-                                .collection("applications")
-                                .where("sponsorId", isEqualTo: uid)
-                                .snapshots(),
+                          return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                            stream: ApplicationService().getVisibleSponsorApplicationDocs(uid),
                             builder: (context, applicationSnapshot) {
-                              final appDocs = applicationSnapshot.data?.docs ?? [];
+                              final appDocs = applicationSnapshot.data ?? [];
                               final totalApplications = appDocs.length;
                               final approvedApplications = appDocs.where((doc) {
                                 final data = doc.data() as Map<String, dynamic>;
@@ -314,18 +317,14 @@ class _SponsorDashboardState extends State<SponsorDashboard>
                       // ==============================
                       _reveal(
                         8,
-                        StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection("applications")
-                              .where("sponsorId", isEqualTo: uid)
-                              .limit(5)
-                              .snapshots(),
+                        StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                          stream: ApplicationService().getVisibleSponsorApplicationDocs(uid),
                           builder: (context, snapshot) {
                             if (!snapshot.hasData) {
                               return const _RecentApplicationsCard(child: _LoadingRow());
                             }
 
-                            final docs = List.of(snapshot.data!.docs);
+                            final docs = List.of(snapshot.data!).take(5).toList();
                             // Sort client-side by submission time when present, newest first —
                             // avoids requiring a composite Firestore index.
                             docs.sort((a, b) {
@@ -379,134 +378,293 @@ class _SponsorDashboardState extends State<SponsorDashboard>
 // ==============================
 // HEADER
 // ==============================
-class _SponsorHeader extends StatelessWidget {
+class _SponsorHeader extends StatefulWidget {
   final String uid;
   const _SponsorHeader({required this.uid});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 22, 24, 30),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primary.withOpacity(0.82)],
+  State<_SponsorHeader> createState() => _SponsorHeaderState();
+}
+
+class _SponsorHeaderState extends State<_SponsorHeader>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _loop;
+
+  @override
+  void initState() {
+    super.initState();
+    _loop = AnimationController(vsync: this, duration: const Duration(seconds: 6))
+      ..repeat();
+  }
+
+  @override
+  void dispose() {
+    _loop.dispose();
+    super.dispose();
+  }
+
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    return "Good evening";
+  }
+
+  Widget _twinkle(double t, double phase, {double? right, double? top, double? left, double? bottom, double size = 4}) {
+    final o = 0.15 + 0.5 * (0.5 + 0.5 * math.sin(t * 2 + phase));
+    return Positioned(
+      right: right,
+      top: top,
+      left: left,
+      bottom: bottom,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withOpacity(o),
+          boxShadow: [BoxShadow(color: Colors.white.withOpacity(o * 0.8), blurRadius: 6)],
         ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.28),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
       ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            right: -30,
-            top: -40,
-            child: Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.06)),
-            ),
-          ),
-          Positioned(
-            right: 120,
-            bottom: -60,
-            child: Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.05)),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Welcome back 👋",
-                    style: AppTextStyles.subtitle.copyWith(
-                      color: Colors.white.withOpacity(0.85),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
-                    child: IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.notifications_rounded, color: Colors.white, size: 20),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance.collection("users").doc(uid).snapshots(),
-                builder: (context, snapshot) {
-                  String orgName = "Sponsor";
-                  String? logoUrl;
+    );
+  }
 
-                  if (snapshot.hasData && snapshot.data!.exists) {
-                    final data = snapshot.data!.data() as Map<String, dynamic>?;
-                    orgName = (data?["organizationName"] ?? data?["name"] ?? "Sponsor").toString();
-                    logoUrl = data?["logoUrl"] as String?;
-                  }
+  @override
+  Widget build(BuildContext context) {
+    final gold = AppColors.secondary;
 
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.18),
-                          shape: BoxShape.circle,
-                          image: logoUrl != null && logoUrl.isNotEmpty
-                              ? DecorationImage(image: NetworkImage(logoUrl), fit: BoxFit.cover)
-                              : null,
-                        ),
-                        child: (logoUrl == null || logoUrl.isEmpty)
-                            ? Center(
-                          child: Text(
-                            orgName.isNotEmpty ? orgName[0].toUpperCase() : "S",
-                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
-                          ),
-                        )
-                            : null,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          orgName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.title.copyWith(
-                            color: Colors.white,
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+    return AnimatedBuilder(
+      animation: _loop,
+      builder: (context, _) {
+        final v = _loop.value;
+        final t = 2 * math.pi * v;
+        final drift = math.sin(t);
+        final drift2 = math.cos(t);
+        final pulse = 0.5 + 0.5 * math.sin(t * 3); // 3 pulses per loop
+
+        return Container(
+          width: double.infinity,
+          clipBehavior: Clip.antiAlias,
+          padding: const EdgeInsets.fromLTRB(24, 22, 24, 28),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment(-1 + 0.5 * drift, -1),
+              end: Alignment(1, 1 + 0.4 * drift2),
+              colors: [
+                AppColors.primary,
+                Color.lerp(AppColors.primary, gold, 0.16)!,
+                AppColors.primary.withOpacity(0.88),
+              ],
+            ),
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(32),
+              bottomRight: Radius.circular(32),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.30),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
-        ],
-      ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // floating drifting orbs
+              Positioned(
+                right: -30 + 14 * drift,
+                top: -40 + 10 * drift2,
+                child: Container(
+                  width: 150,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(colors: [
+                      Colors.white.withOpacity(0.12),
+                      Colors.white.withOpacity(0.03),
+                    ]),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 120 + 16 * drift2,
+                bottom: -60 + 8 * drift,
+                child: Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: gold.withOpacity(0.10)),
+                ),
+              ),
+              Positioned(
+                left: 260 + 24 * drift,
+                top: -30 + 6 * drift2,
+                child: Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.05)),
+                ),
+              ),
+              _twinkle(t, 0, right: 90, top: 34),
+              _twinkle(t, 1.6, right: 210, top: 78, size: 3),
+              _twinkle(t, 3.1, right: 40, bottom: 26, size: 5),
+              _twinkle(t, 4.4, left: 330, bottom: 34, size: 3),
+
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            "${_greeting()}, welcome back ",
+                            style: AppTextStyles.subtitle.copyWith(
+                              color: Colors.white.withOpacity(0.88),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Transform.rotate(
+                            angle: 0.45 * math.sin(t * 4),
+                            alignment: Alignment.bottomRight,
+                            child: const Text("👋", style: TextStyle(fontSize: 16)),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withOpacity(0.18)),
+                        ),
+                        child: IconButton(
+                          onPressed: () {},
+                          icon: const Icon(Icons.notifications_rounded, color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  StreamBuilder<DocumentSnapshot>(
+                    stream: FirebaseFirestore.instance.collection("users").doc(widget.uid).snapshots(),
+                    builder: (context, snapshot) {
+                      String orgName = "Sponsor";
+                      String? logoUrl;
+
+                      if (snapshot.hasData && snapshot.data!.exists) {
+                        final data = snapshot.data!.data() as Map<String, dynamic>?;
+                        orgName = (data?["organizationName"] ?? data?["name"] ?? "Sponsor").toString();
+                        logoUrl = data?["logoUrl"] as String?;
+                      }
+
+                      final hasLogo = logoUrl != null && logoUrl.isNotEmpty;
+
+                      return TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: 1),
+                        duration: const Duration(milliseconds: 900),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, e, child) => Opacity(
+                          opacity: e,
+                          child: Transform.translate(offset: Offset(-24 * (1 - e), 0), child: child),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // avatar with glowing gold ring
+                            Container(
+                              width: 58,
+                              height: 58,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.18),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: gold.withOpacity(0.55 + 0.45 * pulse), width: 2.2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: gold.withOpacity(0.20 + 0.30 * pulse),
+                                    blurRadius: 10 + 12 * pulse,
+                                    spreadRadius: 1 + 2 * pulse,
+                                  ),
+                                ],
+                                image: hasLogo
+                                    ? DecorationImage(image: NetworkImage(logoUrl!), fit: BoxFit.cover)
+                                    : null,
+                              ),
+                              child: !hasLogo
+                                  ? Center(
+                                child: Text(
+                                  orgName.isNotEmpty ? orgName[0].toUpperCase() : "S",
+                                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800),
+                                ),
+                              )
+                                  : null,
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // shimmering name
+                                  ShaderMask(
+                                    blendMode: BlendMode.srcIn,
+                                    shaderCallback: (rect) => LinearGradient(
+                                      begin: Alignment(-2 + 4 * v, 0),
+                                      end: Alignment(-1 + 4 * v, 0),
+                                      colors: const [Colors.white, Color(0xFFFFE7A0), Colors.white],
+                                    ).createShader(rect),
+                                    child: Text(
+                                      orgName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTextStyles.title.copyWith(
+                                        color: Colors.white,
+                                        fontSize: 30,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.4,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.13),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: gold.withOpacity(0.5)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.workspace_premium_rounded, size: 14, color: gold),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          "Scholarship Sponsor",
+                                          style: AppTextStyles.subtitle.copyWith(
+                                            color: Colors.white.withOpacity(0.92),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

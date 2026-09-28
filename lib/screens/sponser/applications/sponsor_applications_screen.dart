@@ -7,6 +7,14 @@ import '../../../models/application_model.dart';
 import '../../../services/application_service.dart';
 import 'application_details_screen.dart';
 
+/// Reads totalScore from the application data (0 for older applications
+/// that were submitted before scoring existed).
+double _scoreOf(ApplicationModel application) {
+  final value = application.toMap()["totalScore"];
+  if (value is num) return value.toDouble();
+  return double.tryParse(value?.toString() ?? "") ?? 0;
+}
+
 class SponsorApplicationsScreen extends StatelessWidget {
   SponsorApplicationsScreen({super.key});
 
@@ -73,8 +81,10 @@ class SponsorApplicationsScreen extends StatelessWidget {
             );
           }
 
+          // Highest totalScore first, so the best candidates are on top.
           final applications =
-              snapshot.data ?? [];
+          List<ApplicationModel>.from(snapshot.data ?? [])
+            ..sort((a, b) => _scoreOf(b).compareTo(_scoreOf(a)));
 
           if (applications.isEmpty) {
             return _emptyState();
@@ -447,6 +457,31 @@ class _ApplicationCard extends StatelessWidget {
               ),
             ],
           ),
+
+          if (_scoreOf(application) > 0) ...[
+            const SizedBox(height: 10),
+
+            Row(
+              children: [
+                Icon(
+                  Icons.insights_rounded,
+                  size: 16,
+                  color: AppColors.secondary,
+                ),
+
+                const SizedBox(width: 5),
+
+                Text(
+                  "Score: ${_scoreOf(application).toStringAsFixed(1)} / 100",
+                  style: AppTextStyles.subtitle.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ],
 
           const SizedBox(height: 16),
 
