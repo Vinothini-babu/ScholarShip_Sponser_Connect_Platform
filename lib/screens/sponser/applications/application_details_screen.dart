@@ -73,9 +73,16 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
   }
 
   Future<void> updateStatus(String status, Map<String, dynamic> currentData) async {
+    // Documents MUST be verified before approving (no "approve anyway").
     if (status == "Approved" && currentData["documentsVerified"] != true) {
-      final proceed = await _confirmApproveWithoutVerification();
-      if (!proceed) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Verify the uploaded documents first (turn on \"Documents Verified\"), then approve.",
+          ),
+        ),
+      );
+      return;
     }
 
     final sponsorId = FirebaseAuth.instance.currentUser?.uid;

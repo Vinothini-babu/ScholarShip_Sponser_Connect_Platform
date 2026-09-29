@@ -147,6 +147,13 @@ class ApplicationService {
     final appRef = _firestore.collection('applications').doc(applicationId);
     final batch = _firestore.batch();
 
+    final appSnap = await appRef.get();
+    final appData = appSnap.data() ?? <String, dynamic>{};
+
+    if (status == "Approved" && appData['documentsVerified'] != true) {
+      return "Verify the uploaded documents before approving.";
+    }
+
     if (status == "Approved" && studentId != null) {
       final u = await _firestore.collection('users').doc(studentId).get();
       final d = u.data();
@@ -165,6 +172,24 @@ class ApplicationService {
 
     if (studentId != null) {
       final userRef = _firestore.collection('users').doc(studentId);
+
+      // notify the student about the decision
+      final schTitle =
+      (appData['scholarshipTitle'] ?? 'your scholarship').toString();
+      batch.set(_firestore.collection('notifications').doc(), {
+        'userId': studentId,
+        'type': status == "Approved" ? 'approved' : 'rejected',
+        'title': status == "Approved"
+            ? "Application Approved 🎉"
+            : "Application Update",
+        'body': status == "Approved"
+            ? "Congratulations! Your application for $schTitle has been approved."
+            : "Your application for $schTitle was not approved this time.",
+        'sponsorId': sponsorId,
+        'applicationId': applicationId,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
 
       if (status == "Approved") {
         batch.update(userRef, {

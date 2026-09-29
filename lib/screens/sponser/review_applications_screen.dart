@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/application_service.dart';
+import 'applications/application_details_screen.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
@@ -30,12 +31,12 @@ class ReviewApplicationsScreen extends StatelessWidget {
         ),
       ),
 
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection("applications")
-            .where("sponsorId", isEqualTo: FirebaseAuth.instance.currentUser?.uid)
-            .where("status", isEqualTo: "Pending")
-            .snapshots(),
+      // Privacy filter: students already awarded by ANOTHER sponsor are
+      // hidden here (same filter the Applications Received screen uses).
+      body: StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+        stream: ApplicationService().getVisibleSponsorApplicationDocs(
+          FirebaseAuth.instance.currentUser?.uid ?? "",
+        ),
 
         builder: (context, snapshot) {
 
@@ -46,16 +47,26 @@ class ReviewApplicationsScreen extends StatelessWidget {
             );
           }
 
-          if (!snapshot.hasData ||
-              snapshot.data!.docs.isEmpty) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(
+                "Something went wrong\n${snapshot.error}",
+                textAlign: TextAlign.center,
+              ),
+            );
+          }
+
+          final applications = (snapshot.data ?? [])
+              .where((d) => (d.data()["status"] ?? "").toString() == "Pending")
+              .toList();
+
+          if (applications.isEmpty) {
             return const Center(
               child: Text(
                 "No Pending Applications",
               ),
             );
           }
-
-          final applications = snapshot.data!.docs;
 
           return ListView.builder(
             padding: const EdgeInsets.all(20),
@@ -65,9 +76,7 @@ class ReviewApplicationsScreen extends StatelessWidget {
               final application =
               applications[index];
 
-              final data =
-              application.data()
-              as Map<String, dynamic>;
+              final data = application.data();
 
               return _ApplicationCard(
                 documentId: application.id,
@@ -224,41 +233,25 @@ class _ApplicationCard extends StatelessWidget {
 
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () async {
-
-                    final error = await ApplicationService().setStatusWithAward(
-                      applicationId: documentId,
-                      status: "Approved",
-                      sponsorId: FirebaseAuth.instance.currentUser!.uid,
-                      studentId: (data["studentId"] ?? data["uid"])?.toString(),
-                      scholarshipId: data["scholarshipId"]?.toString(),
-                      extraAppFields: {},
-                      wasApproved: false,
-                    );
-
-                    if (!context.mounted) return;
-
-                    if (error != null) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text(error)));
-                      return;
-                    }
-
-                    ScaffoldMessenger.of(context)
-                        .showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          "Application Approved ✅",
+                  onPressed: () {
+                    // Approve only from the full review screen, after the
+                    // sponsor has viewed + verified the documents.
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ApplicationDetailsScreen(
+                          data: data,
+                          applicationId: documentId,
                         ),
                       ),
                     );
                   },
 
-                  icon: const Icon(Icons.check),
-                  label: const Text("Approve"),
+                  icon: const Icon(Icons.fact_check_rounded),
+                  label: const Text("Review & Verify"),
 
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                       vertical: 14,

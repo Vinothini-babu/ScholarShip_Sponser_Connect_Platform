@@ -20,6 +20,8 @@ import 'scholarship_info_screen.dart';
 import 'upload_documents_screen.dart';
 import '../../utils/eligibility_utils.dart';
 import 'all_scholarships_screen.dart';
+import 'support_screen.dart';
+import 'notification_screen.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -309,7 +311,12 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       _QuickAction(
                         icon: Icons.support_agent,
                         title: "Support",
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const SupportScreen()),
+                          );
+                        },
                       ),
                     ];
 
@@ -675,6 +682,7 @@ class _GradientHeaderState extends State<_GradientHeader>
                   ),
                 ],
               ),
+              const Positioned(top: -6, right: 0, child: NotificationBell()),
             ],
           ),
         );
