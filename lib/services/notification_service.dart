@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 /// Firestore collection: notifications
 /// {
@@ -45,10 +46,12 @@ class NotificationService {
     required String type,
     required String title,
     required String body,
+    String audience = "student", // "student" | "sponsor"
     Map<String, dynamic> extra = const {},
   }) {
     return _col.add({
       "userId": userId,
+      "audience": audience,
       "type": type,
       "title": title,
       "body": body,
@@ -56,6 +59,45 @@ class NotificationService {
       "createdAt": FieldValue.serverTimestamp(),
       ...extra,
     });
+  }
+
+  /// One action -> a notification for the student AND one for the sponsor.
+  /// Never throws (a failed notification must not break the real action).
+  Future<void> sendPair({
+    required String? studentId,
+    required String? sponsorId,
+    required String type,
+    String? sponsorType,
+    required String studentTitle,
+    required String studentBody,
+    required String sponsorTitle,
+    required String sponsorBody,
+    Map<String, dynamic> extra = const {},
+  }) async {
+    try {
+      if (studentId != null && studentId.isNotEmpty) {
+        await send(
+          userId: studentId,
+          audience: "student",
+          type: type,
+          title: studentTitle,
+          body: studentBody,
+          extra: {if (sponsorId != null) "sponsorId": sponsorId, ...extra},
+        );
+      }
+      if (sponsorId != null && sponsorId.isNotEmpty) {
+        await send(
+          userId: sponsorId,
+          audience: "sponsor",
+          type: sponsorType ?? type,
+          title: sponsorTitle,
+          body: sponsorBody,
+          extra: {if (studentId != null) "studentId": studentId, ...extra},
+        );
+      }
+    } catch (e) {
+      debugPrint("NOTIFY ERROR: $e");
+    }
   }
 
   // ---------------- Invite to Apply (sponsor -> student) ----------------
@@ -84,6 +126,7 @@ class NotificationService {
 
     await ref.set({
       "userId": studentId,
+      "audience": "student",
       "type": "invite",
       "title": "You're invited to apply 🎓",
       "body":

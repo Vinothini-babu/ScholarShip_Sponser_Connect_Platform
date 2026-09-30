@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/application_model.dart';
+import 'notification_service.dart';
 
 class ApplicationService {
   final FirebaseFirestore _firestore =
@@ -36,6 +37,22 @@ class ApplicationService {
 
       await _firestore.collection("applications").add(
         application.toMap(),
+      );
+
+      // notify sponsor (new application) + student (confirmation)
+      final m = application.toMap();
+      final sch = (m['scholarshipTitle'] ?? 'a scholarship').toString();
+      final who = (m['studentName'] ?? 'A student').toString();
+      await NotificationService().sendPair(
+        studentId: application.studentId,
+        sponsorId: m['sponsorId']?.toString(),
+        type: 'applied',
+        sponsorType: 'application_received',
+        studentTitle: "Application Submitted ✅",
+        studentBody:
+        "Your application for $sch has been submitted. The sponsor will review it soon.",
+        sponsorTitle: "New Application Received",
+        sponsorBody: "$who applied for $sch. Open Applications to review it.",
       );
 
       return "Success";
@@ -178,6 +195,7 @@ class ApplicationService {
       (appData['scholarshipTitle'] ?? 'your scholarship').toString();
       batch.set(_firestore.collection('notifications').doc(), {
         'userId': studentId,
+        'audience': 'student',
         'type': status == "Approved" ? 'approved' : 'rejected',
         'title': status == "Approved"
             ? "Application Approved 🎉"
@@ -186,6 +204,22 @@ class ApplicationService {
             ? "Congratulations! Your application for $schTitle has been approved."
             : "Your application for $schTitle was not approved this time.",
         'sponsorId': sponsorId,
+        'applicationId': applicationId,
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // sponsor's own activity copy
+      batch.set(_firestore.collection('notifications').doc(), {
+        'userId': sponsorId,
+        'audience': 'sponsor',
+        'type': status == "Approved" ? 'approved' : 'rejected',
+        'title': status == "Approved"
+            ? "You approved an application"
+            : "You rejected an application",
+        'body':
+        "${(appData['studentName'] ?? 'Student').toString()} · $schTitle",
+        'studentId': studentId,
         'applicationId': applicationId,
         'isRead': false,
         'createdAt': FieldValue.serverTimestamp(),

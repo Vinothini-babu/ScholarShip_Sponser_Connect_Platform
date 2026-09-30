@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../services/application_service.dart';
+import '../../../services/notification_service.dart';
 
 class ApplicationDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -136,6 +137,153 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
     return result ?? false;
   }
 
+  // ---------------- notifications (student + sponsor) ----------------
+
+  String get _schTitle =>
+      (widget.data["scholarshipTitle"] ?? "the scholarship").toString();
+  String get _studentName =>
+      (widget.data["studentName"] ?? "the student").toString();
+
+  Future<void> _notifyBoth({
+    required String type,
+    required String studentTitle,
+    required String studentBody,
+    required String sponsorTitle,
+    required String sponsorBody,
+  }) {
+    return NotificationService().sendPair(
+      studentId: (widget.data["studentId"] ?? widget.data["uid"])?.toString(),
+      sponsorId: FirebaseAuth.instance.currentUser?.uid,
+      type: type,
+      studentTitle: studentTitle,
+      studentBody: studentBody,
+      sponsorTitle: sponsorTitle,
+      sponsorBody: sponsorBody,
+      extra: {"applicationId": widget.applicationId},
+    );
+  }
+
+  String _fmtDateTime(DateTime d) {
+    const m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    final ampm = d.hour >= 12 ? "PM" : "AM";
+    return "${d.day} ${m[d.month - 1]} ${d.year}, $h:${d.minute.toString().padLeft(2, '0')} $ampm";
+  }
+
+  /// Sponsor asks the student to come in person with original documents.
+  Future<void> _scheduleVerificationVisit() async {
+    final venueController = TextEditingController();
+    final noteController =
+    TextEditingController(text: "Please bring all original documents.");
+    DateTime? picked;
+    String? errorText;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Schedule Verification Visit"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "The student will get a notification asking them to visit with their original documents.",
+                  style: TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.event_rounded, size: 18),
+                  label: Text(picked == null ? "Pick date & time" : _fmtDateTime(picked!)),
+                  onPressed: () async {
+                    final d = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now().add(const Duration(days: 1)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 180)),
+                    );
+                    if (d == null || !context.mounted) return;
+                    final t = await showTimePicker(
+                      context: context,
+                      initialTime: const TimeOfDay(hour: 10, minute: 0),
+                    );
+                    if (t == null) return;
+                    setDialogState(() {
+                      picked = DateTime(d.year, d.month, d.day, t.hour, t.minute);
+                      errorText = null;
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: venueController,
+                  decoration: const InputDecoration(
+                    labelText: "Venue / address",
+                    hintText: "e.g. Trust Office, Gobichettipalayam",
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: noteController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: "Note for the student"),
+                ),
+                if (errorText != null) ...[
+                  const SizedBox(height: 10),
+                  Text(errorText!, style: const TextStyle(color: Colors.red, fontSize: 12.5)),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              onPressed: () {
+                if (picked == null || venueController.text.trim().isEmpty) {
+                  setDialogState(() => errorText = "Pick a date/time and enter the venue.");
+                  return;
+                }
+                Navigator.pop(context, true);
+              },
+              child: const Text("Send to student"),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || picked == null) return;
+
+    final when = _fmtDateTime(picked!);
+    final venue = venueController.text.trim();
+    final note = noteController.text.trim();
+
+    await FirebaseFirestore.instance.collection("applications").doc(widget.applicationId).update({
+      "verificationVisit": {
+        "scheduledFor": Timestamp.fromDate(picked!),
+        "venue": venue,
+        "note": note,
+        "requestedAt": Timestamp.now(),
+      },
+    });
+
+    await _notifyBoth(
+      type: "visit_request",
+      studentTitle: "Document Verification Visit 📅",
+      studentBody:
+      "Please visit $venue on $when with your original documents for $_schTitle. ${note.isNotEmpty ? note : ''}".trim(),
+      sponsorTitle: "Verification visit scheduled",
+      sponsorBody: "$_studentName · $when · $venue",
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Visit scheduled - student notified ✅")),
+    );
+  }
+
   Future<void> _toggleDocumentsVerified(bool value, Map<String, dynamic> currentData) async {
     // Documents are worth 20 of the 100-point evaluation score — recompute
     // the total whenever this is toggled, since academic/income scores
@@ -151,6 +299,17 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
         "documentsScore": documentsScore,
         "totalScore": academicScore + incomeScore + documentsScore,
       });
+
+      if (value) {
+        await _notifyBoth(
+          type: "docs_verified",
+          studentTitle: "Documents Verified ✅",
+          studentBody:
+          "The sponsor has reviewed and verified your uploaded documents for $_schTitle.",
+          sponsorTitle: "Documents marked verified",
+          sponsorBody: "$_studentName · $_schTitle",
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -213,6 +372,15 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
       "fieldVerifiedNote": noteController.text.trim(),
       "fieldVerifiedAt": Timestamp.now(),
     });
+
+    await _notifyBoth(
+      type: "field_verified",
+      studentTitle: "In-person Verification Completed ✅",
+      studentBody:
+      "Your original documents for $_schTitle were verified in person${verifiedByController.text.trim().isEmpty ? '' : ' by ${verifiedByController.text.trim()}'}.",
+      sponsorTitle: "Field verification recorded",
+      sponsorBody: "$_studentName · $_schTitle",
+    );
   }
 
   Future<void> _openDocument(String url) async {
@@ -248,6 +416,15 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
       "currentSemester": semesterNumber + 1,
     });
     await batch.commit();
+
+    await _notifyBoth(
+      type: "semester_approved",
+      studentTitle: "Semester $semesterNumber Approved ✅",
+      studentBody:
+      "Your semester $semesterNumber update for $_schTitle was approved. You can submit semester ${semesterNumber + 1} now.",
+      sponsorTitle: "Semester $semesterNumber approved",
+      sponsorBody: "$_studentName · $_schTitle",
+    );
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -317,6 +494,17 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
       batch.update(appRef, {"scholarshipStatus": "Suspended"});
     }
     await batch.commit();
+
+    await _notifyBoth(
+      type: "semester_rejected",
+      studentTitle: "Semester $semesterNumber Update Rejected",
+      studentBody:
+      "Your semester $semesterNumber update for $_schTitle was rejected."
+          "${remarksController.text.trim().isEmpty ? '' : ' Remarks: ${remarksController.text.trim()}'}"
+          "${suspendScholarship ? ' Your scholarship has been suspended.' : ''}",
+      sponsorTitle: "Semester $semesterNumber rejected",
+      sponsorBody: "$_studentName · $_schTitle",
+    );
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -657,6 +845,25 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
                                   child: Text(fieldVerified ? "Update" : "Mark Verified"),
                                 ),
                               ],
+                            ),
+                            if (data["verificationVisit"] is Map) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                "Visit scheduled: "
+                                    "${(data["verificationVisit"]["scheduledFor"] is Timestamp) ? _fmtDateTime((data["verificationVisit"]["scheduledFor"] as Timestamp).toDate()) : "—"}"
+                                    " · ${data["verificationVisit"]["venue"] ?? ""}",
+                                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              ),
+                            ],
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: _scheduleVerificationVisit,
+                                icon: const Icon(Icons.event_available_rounded, size: 18),
+                                label: Text(data["verificationVisit"] is Map
+                                    ? "Reschedule verification visit"
+                                    : "Schedule verification visit"),
+                              ),
                             ),
                           ],
                         ),

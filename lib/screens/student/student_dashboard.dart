@@ -143,201 +143,203 @@ class _StudentDashboardState extends State<StudentDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                    stream: FirebaseFirestore.instance
-                        .collection("users")
-                        .doc(FirebaseAuth.instance.currentUser?.uid)
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      final data = snapshot.data?.data();
-                      String name = (data?["name"] ??
-                          data?["fullName"] ??
-                          data?["userName"] ??
-                          FirebaseAuth.instance.currentUser?.displayName ??
-                          "")
-                          .toString()
-                          .trim();
-                      if (name.isEmpty) name = "Student";
-                      return _GradientHeader(userName: name, profile: data);
-                    },
-                  ),
-                  Positioned(
-                    bottom: -46,
-                    left: 20,
-                    right: 20,
-                    child: _PromoBanner(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AllScholarshipsScreen()),
+      body: InviteBannerHost(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseFirestore.instance
+                          .collection("users")
+                          .doc(FirebaseAuth.instance.currentUser?.uid)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        final data = snapshot.data?.data();
+                        String name = (data?["name"] ??
+                            data?["fullName"] ??
+                            data?["userName"] ??
+                            FirebaseAuth.instance.currentUser?.displayName ??
+                            "")
+                            .toString()
+                            .trim();
+                        if (name.isEmpty) name = "Student";
+                        return _GradientHeader(userName: name, profile: data);
+                      },
+                    ),
+                    Positioned(
+                      bottom: -46,
+                      left: 20,
+                      right: 20,
+                      child: _PromoBanner(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AllScholarshipsScreen()),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
 
-              const SizedBox(height: 66),
+                const SizedBox(height: 66),
 
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: const _StatsGrid(),
-              ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: const _StatsGrid(),
+                ),
 
-              const SizedBox(height: 30),
+                const SizedBox(height: 30),
 
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _SectionHeader(
-                  title: "Trending Scholarships",
-                  actionLabel: "See All",
-                  onAction: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const AllScholarshipsScreen()),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _SectionHeader(
+                    title: "Trending Scholarships",
+                    actionLabel: "See All",
+                    onAction: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AllScholarshipsScreen()),
+                    ),
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 18),
+                const SizedBox(height: 18),
 
-              SizedBox(
-                height: 240,
-                child: StreamBuilder<List<ScholarshipModel>>(
-                  stream: scholarshipService.getScholarships(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator(color: AppColors.primary));
-                    }
+                SizedBox(
+                  height: 240,
+                  child: StreamBuilder<List<ScholarshipModel>>(
+                    stream: scholarshipService.getScholarships(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(child: CircularProgressIndicator(color: AppColors.primary));
+                      }
 
-                    if (snapshot.hasError) {
-                      debugPrint("❌ Trending scholarships error: ${snapshot.error}");
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Text(
-                            "Unable to load scholarships.\n\n${snapshot.error}",
-                            textAlign: TextAlign.center,
-                            style: AppTextStyles.subtitle.copyWith(color: AppColors.error, fontSize: 12),
-                          ),
-                        ),
-                      );
-                    }
-
-                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                      return Center(
-                        child: Text("No Scholarships Available", style: AppTextStyles.subtitle),
-                      );
-                    }
-
-                    final scholarships = snapshot.data!;
-
-                    return ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: scholarships.length,
-                      itemBuilder: (context, index) {
-                        final scholarship = scholarships[index];
-                        return _ScholarshipCard(
-                          scholarshipId: scholarship.id,
-                          title: scholarship.title,
-                          amount: scholarship.amount,
-                          deadline: scholarship.lastDate,
-                          icon: Icons.school,
-                          accent: AppColors.primary,
-                          onTap: () => _handleScholarshipTap(
-                            context,
-                            scholarship.id,
+                      if (snapshot.hasError) {
+                        debugPrint("❌ Trending scholarships error: ${snapshot.error}");
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Text(
+                              "Unable to load scholarships.\n\n${snapshot.error}",
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.subtitle.copyWith(color: AppColors.error, fontSize: 12),
+                            ),
                           ),
                         );
-                      },
-                    );
-                  },
+                      }
+
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return Center(
+                          child: Text("No Scholarships Available", style: AppTextStyles.subtitle),
+                        );
+                      }
+
+                      final scholarships = snapshot.data!;
+
+                      return ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: scholarships.length,
+                        itemBuilder: (context, index) {
+                          final scholarship = scholarships[index];
+                          return _ScholarshipCard(
+                            scholarshipId: scholarship.id,
+                            title: scholarship.title,
+                            amount: scholarship.amount,
+                            deadline: scholarship.lastDate,
+                            icon: Icons.school,
+                            accent: AppColors.primary,
+                            onTap: () => _handleScholarshipTap(
+                              context,
+                              scholarship.id,
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 30),
+                const SizedBox(height: 30),
 
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: const _SectionHeader(title: "Quick Actions"),
-              ),
-
-              const SizedBox(height: 18),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isWide = constraints.maxWidth >= 500;
-                    final crossAxisCount = isWide ? 4 : 2;
-
-                    final actions = [
-                      _QuickAction(
-                        icon: Icons.assignment,
-                        title: "My Applications",
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const MyApplicationsScreen()),
-                          );
-                        },
-                      ),
-                      _QuickAction(
-                        icon: Icons.person,
-                        title: "My Profile",
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                          );
-                        },
-                      ),
-                      _QuickAction(
-                        icon: Icons.favorite,
-                        title: "Saved",
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => SavedScholarshipsScreen()),
-                          );
-                        },
-                      ),
-                      _QuickAction(
-                        icon: Icons.support_agent,
-                        title: "Support",
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const SupportScreen()),
-                          );
-                        },
-                      ),
-                    ];
-
-                    return GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: actions.length,
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: crossAxisCount,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        mainAxisExtent: 68,
-                      ),
-                      itemBuilder: (context, index) => actions[index],
-                    );
-                  },
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: const _SectionHeader(title: "Quick Actions"),
                 ),
-              ),
 
-              const SizedBox(height: 30),
-            ],
+                const SizedBox(height: 18),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 500;
+                      final crossAxisCount = isWide ? 4 : 2;
+
+                      final actions = [
+                        _QuickAction(
+                          icon: Icons.assignment,
+                          title: "My Applications",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const MyApplicationsScreen()),
+                            );
+                          },
+                        ),
+                        _QuickAction(
+                          icon: Icons.person,
+                          title: "My Profile",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                            );
+                          },
+                        ),
+                        _QuickAction(
+                          icon: Icons.favorite,
+                          title: "Saved",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => SavedScholarshipsScreen()),
+                            );
+                          },
+                        ),
+                        _QuickAction(
+                          icon: Icons.support_agent,
+                          title: "Support",
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SupportScreen()),
+                            );
+                          },
+                        ),
+                      ];
+
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: actions.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          mainAxisExtent: 68,
+                        ),
+                        itemBuilder: (context, index) => actions[index],
+                      );
+                    },
+                  ),
+                ),
+
+                const SizedBox(height: 30),
+              ],
+            ),
           ),
         ),
       ),

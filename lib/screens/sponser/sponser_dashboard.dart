@@ -11,6 +11,7 @@ import 'applications/sponsor_applications_screen.dart';
 import 'sponsor_profile_screen.dart';
 import 'dashboard/approved_students_screen.dart';
 import 'dashboard/student_suggestions.dart';
+import '../student/notification_screen.dart';
 import '../../services/application_service.dart';
 
 class SponsorDashboard extends StatefulWidget {
@@ -533,17 +534,7 @@ class _SponsorHeaderState extends State<_SponsorHeader>
                           ),
                         ],
                       ),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white.withOpacity(0.18)),
-                        ),
-                        child: IconButton(
-                          onPressed: () {},
-                          icon: const Icon(Icons.notifications_rounded, color: Colors.white, size: 20),
-                        ),
-                      ),
+                      const NotificationBell(),
                     ],
                   ),
                   const SizedBox(height: 14),
