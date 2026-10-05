@@ -118,6 +118,7 @@ class NotificationService {
     required String sponsorName,
     required String studentId,
     required List<String> scholarshipTitles,
+    List<String> scholarshipIds = const [],
   }) async {
     final ref = _col.doc(inviteDocId(sponsorId, studentId));
 
@@ -136,9 +137,58 @@ class NotificationService {
       "sponsorId": sponsorId,
       "sponsorName": sponsorName,
       "scholarshipTitles": scholarshipTitles,
+      "scholarshipIds": scholarshipIds,
+      "status": "invited",
       "isRead": false,
       "createdAt": FieldValue.serverTimestamp(),
     });
     return null;
+  }
+
+  // ---------------- Invited student applied (student -> sponsor) ----------------
+
+  /// Call right after a student's application is saved successfully.
+  /// If this sponsor had invited this student, the invite is marked "applied"
+  /// and the sponsor gets an "Invited student applied" notification.
+  /// Never throws. Returns true if a sponsor notification was sent.
+  Future<bool> onStudentApplied({
+    required String studentId,
+    required String sponsorId,
+    required String studentName,
+    required String scholarshipTitle,
+    String? applicationId,
+  }) async {
+    try {
+      if (studentId.isEmpty || sponsorId.isEmpty) return false;
+
+      final ref = _col.doc(inviteDocId(sponsorId, studentId));
+      final snap = await ref.get();
+      if (!snap.exists) return false; // student was not invited by this sponsor
+
+      await ref.update({
+        "status": "applied",
+        "appliedAt": FieldValue.serverTimestamp(),
+        "appliedTitles": FieldValue.arrayUnion([scholarshipTitle]),
+      });
+
+      await send(
+        userId: sponsorId,
+        audience: "sponsor",
+        type: "invite_accepted",
+        title: "Invited student applied 🎉",
+        body: "$studentName accepted your invitation and applied for "
+            "$scholarshipTitle. Review the application now.",
+        extra: {
+          "studentId": studentId,
+          "studentName": studentName,
+          "scholarshipTitle": scholarshipTitle,
+          if (applicationId != null) "applicationId": applicationId,
+        },
+      );
+      return true;
+    } catch (e) {
+      debugPrint("NOTIFY onStudentApplied ERROR: $e");
+      return false;
+    }
   }
 }

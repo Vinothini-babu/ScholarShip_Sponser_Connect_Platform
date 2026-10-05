@@ -21,7 +21,11 @@ const List<String> _legacyDefaultDocuments = [
 ];
 
 class EligibleScholarshipsScreen extends StatefulWidget {
-  const EligibleScholarshipsScreen({super.key});
+  /// When set, only this one scholarship is shown (used when a student taps
+  /// "Apply for this Scholarship" from an invitation / details screen).
+  final String? scholarshipId;
+
+  const EligibleScholarshipsScreen({super.key, this.scholarshipId});
 
   @override
   State<EligibleScholarshipsScreen> createState() =>
@@ -68,7 +72,9 @@ class _EligibleScholarshipsScreenState
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
-          "Eligible Scholarships",
+          widget.scholarshipId == null
+              ? "Eligible Scholarships"
+              : "Apply for Scholarship",
           style: AppTextStyles.title.copyWith(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -157,16 +163,22 @@ class _EligibleScholarshipsScreenState
               final eligibleScholarships =
               scholarshipSnapshot.data!.docs
                   .where(
-                    (doc) => _matches(
-                  doc.data(),
-                  studentData,
-                ),
+                    (doc) =>
+                (widget.scholarshipId == null ||
+                    doc.id == widget.scholarshipId) &&
+                    _matches(
+                      doc.data(),
+                      studentData,
+                    ),
               )
                   .toList();
 
               if (eligibleScholarships.isEmpty) {
                 return _emptyState(
-                  "No Eligible Scholarships",
+                  widget.scholarshipId == null
+                      ? "No Eligible Scholarships"
+                      : "This scholarship is not open for application "
+                      "or you are not eligible for it.",
                 );
               }
 

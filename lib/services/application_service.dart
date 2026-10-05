@@ -35,7 +35,7 @@ class ApplicationService {
         return "Already Applied";
       }
 
-      await _firestore.collection("applications").add(
+      final appRef = await _firestore.collection("applications").add(
         application.toMap(),
       );
 
@@ -53,6 +53,16 @@ class ApplicationService {
         "Your application for $sch has been submitted. The sponsor will review it soon.",
         sponsorTitle: "New Application Received",
         sponsorBody: "$who applied for $sch. Open Applications to review it.",
+      );
+
+      // If this sponsor had invited this student, mark the invitation as
+      // "applied" and tell the sponsor the invited student applied.
+      await NotificationService().onStudentApplied(
+        studentId: application.studentId,
+        sponsorId: (m['sponsorId'] ?? '').toString(),
+        studentName: who,
+        scholarshipTitle: sch,
+        applicationId: appRef.id,
       );
 
       return "Success";

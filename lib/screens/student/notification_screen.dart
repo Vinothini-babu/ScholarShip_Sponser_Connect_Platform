@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,6 +10,8 @@ import '../../core/constants/app_text_styles.dart';
 import '../../services/notification_service.dart';
 import 'all_scholarships_screen.dart';
 import 'my_applications_screen.dart';
+import 'eligible_scholarships_screen.dart';
+import '../../utils/eligibility_utils.dart';
 
 // =========================================================
 // BELL (use in the student dashboard header)
@@ -79,70 +82,2009 @@ class NotificationBell extends StatelessWidget {
 }
 
 // =========================================================
-// INVITE DIALOG (used by the list and by the popup banner)
+// INVITE DETAILS  (professional, real-time invitation view)
+// Used by: notification list, popup banner, dashboard highlight card
 // =========================================================
 
+String _firstText(Map<String, dynamic>? m, List<String> keys) {
+  if (m == null) return "";
+  for (final k in keys) {
+    final v = _val(m[k]);
+    if (v.isNotEmpty) return v;
+  }
+  return "";
+}
+
+String _val(dynamic v) {
+  if (v == null) return "";
+  if (v is Timestamp) {
+    final d = v.toDate();
+    return "${d.day}/${d.month}/${d.year}";
+  }
+  if (v is List) {
+    return v
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .join(", ");
+  }
+  if (v is bool) return v ? "Yes" : "No";
+  return v.toString().trim();
+}
+
 void showInviteDialog(BuildContext context, Map<String, dynamic> data) {
-  final titles = (data["scholarshipTitles"] is List)
-      ? (data["scholarshipTitles"] as List).map((e) => e.toString()).toList()
+  final nav = Navigator.of(context);
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: "Invitation",
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 380),
+    pageBuilder: (dialogContext, _, __) => SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 580, maxHeight: 720),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Material(
+                color: AppColors.background,
+                child: _InviteDetails(
+                  data: data,
+                  dialogContext: dialogContext,
+                  nav: nav,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+    transitionBuilder: (ctx, anim, _, child) {
+      final curved = CurvedAnimation(
+        parent: anim,
+        curve: Curves.easeOutBack,
+        reverseCurve: Curves.easeIn,
+      );
+      return FadeTransition(
+        opacity: anim,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.08),
+            end: Offset.zero,
+          ).animate(curved),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.92, end: 1).animate(curved),
+            child: child,
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _Matched {
+  final String title;
+  final String? id;
+  final Map<String, dynamic>? doc;
+  final bool mine;
+  _Matched({required this.title, this.id, this.doc, this.mine = false});
+}
+
+class _InviteDetails extends StatefulWidget {
+  final Map<String, dynamic> data;
+  final BuildContext dialogContext;
+  final NavigatorState nav;
+
+  const _InviteDetails({
+    required this.data,
+    required this.dialogContext,
+    required this.nav,
+  });
+
+  @override
+  State<_InviteDetails> createState() => _InviteDetailsState();
+}
+
+class _InviteDetailsState extends State<_InviteDetails> {
+  final List<StreamSubscription> _subs = [];
+
+  Map<String, dynamic>? _sponsor;
+  Map<String, dynamic> _student = {};
+  final Map<int, List<QueryDocumentSnapshot<Map<String, dynamic>>>> _chunks =
+  {};
+  Set<String> _appliedIds = {};
+  String? _liveStatus;
+  bool _schLoaded = false;
+  final Set<String> _open = {};
+
+  List<String> get _titles => (widget.data["scholarshipTitles"] is List)
+      ? (widget.data["scholarshipTitles"] as List)
+      .map((e) => e.toString())
+      .toList()
       : <String>[];
 
-  showDialog(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      title: Text((data["title"] ?? "Invitation").toString()),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text((data["body"] ?? "").toString()),
-            if (titles.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              const Text("Scholarships you match:",
-                  style: TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 6),
-              for (final t in titles)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
+  String get _sponsorId => (widget.data["sponsorId"] ?? "").toString();
+
+  @override
+  void initState() {
+    super.initState();
+    _listen();
+  }
+
+  @override
+  void dispose() {
+    for (final s in _subs) {
+      s.cancel();
+    }
+    super.dispose();
+  }
+
+  void _safe(VoidCallback fn) {
+    if (mounted) setState(fn);
+  }
+
+  // Everything below is LIVE (Firestore snapshots) - edits by the sponsor,
+  // a new application by the student etc. reflect instantly in this view.
+  void _listen() {
+    final db = FirebaseFirestore.instance;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    if (_sponsorId.isNotEmpty) {
+      _subs.add(db.collection("users").doc(_sponsorId).snapshots().listen(
+            (s) => _safe(() => _sponsor = s.data()),
+        onError: (e) => debugPrint("INVITE sponsor stream: $e"),
+      ));
+    }
+
+    if (uid != null) {
+      _subs.add(db.collection("users").doc(uid).snapshots().listen(
+            (s) => _safe(() => _student = s.data() ?? {}),
+        onError: (e) => debugPrint("INVITE student stream: $e"),
+      ));
+
+      _subs.add(db
+          .collection("applications")
+          .where("studentId", isEqualTo: uid)
+          .snapshots()
+          .listen(
+            (snap) {
+          final ids = <String>{};
+          for (final d in snap.docs) {
+            final id = d.data()["scholarshipId"];
+            if (id != null) ids.add(id.toString());
+          }
+          _safe(() => _appliedIds = ids);
+        },
+        onError: (e) => debugPrint("INVITE applications stream: $e"),
+      ));
+
+      if (_sponsorId.isNotEmpty) {
+        _subs.add(db
+            .collection("notifications")
+            .doc("invite_${_sponsorId}_$uid")
+            .snapshots()
+            .listen(
+              (s) => _safe(() => _liveStatus = s.data()?["status"]?.toString()),
+          onError: (e) => debugPrint("INVITE status stream: $e"),
+        ));
+      }
+    }
+
+    final titles = _titles;
+    if (titles.isEmpty) _schLoaded = true;
+    for (var i = 0; i < titles.length; i += 10) {
+      final idx = i ~/ 10;
+      final chunk = titles.sublist(i, math.min(i + 10, titles.length));
+      _subs.add(db
+          .collection("scholarships")
+          .where("title", whereIn: chunk)
+          .snapshots()
+          .listen(
+            (snap) => _safe(() {
+          _chunks[idx] = snap.docs;
+          _schLoaded = true;
+        }),
+        onError: (e) {
+          debugPrint("INVITE scholarships stream: $e");
+          _safe(() => _schLoaded = true);
+        },
+      ));
+    }
+  }
+
+  List<_Matched> get _items {
+    final found = <String, _Matched>{};
+    for (final docs in _chunks.values) {
+      for (final d in docs) {
+        final m = d.data();
+        final t = (m["title"] ?? "").toString();
+        final owner =
+        _firstText(m, ["sponsorId", "sponsorUid", "createdBy", "ownerId"]);
+        final mine =
+            owner.isEmpty || _sponsorId.isEmpty || owner == _sponsorId;
+        final old = found[t];
+        if (old == null || (mine && !old.mine)) {
+          found[t] = _Matched(title: t, id: d.id, doc: m, mine: mine);
+        }
+      }
+    }
+    return [for (final t in _titles) found[t] ?? _Matched(title: t)];
+  }
+
+  bool? _eligible(Map<String, dynamic>? sch) {
+    if (sch == null || _student.isEmpty) return null;
+    try {
+      return isStudentEligibleForScholarship(sch, _student);
+    } catch (e) {
+      debugPrint("INVITE eligibility error: $e");
+      return null;
+    }
+  }
+
+  void _close() => Navigator.pop(widget.dialogContext);
+
+  void _openDetails(String id) {
+    final sponsor = (widget.data["sponsorName"] ?? "").toString();
+    _close();
+    widget.nav.push(
+      MaterialPageRoute(
+        builder: (_) => InviteScholarshipDetailsScreen(
+          scholarshipId: id,
+          sponsorName: sponsor.isEmpty ? null : sponsor,
+        ),
+      ),
+    );
+  }
+
+  // Where the student goes to actually apply. Change this one method if the
+  // apply flow lives on a different screen.
+  void _applyTo(String id) => _openDetails(id);
+
+  void _browse() {
+    _close();
+    widget.nav.push(
+      MaterialPageRoute(builder: (_) => const AllScholarshipsScreen()),
+    );
+  }
+
+  // ---------------------------------------------------------
+  @override
+  Widget build(BuildContext context) {
+    final gold = AppColors.secondary;
+    final navy = AppColors.primary;
+
+    final fallbackName = (widget.data["sponsorName"] ?? "A sponsor").toString();
+    final org = _firstText(_sponsor,
+        ["organization", "organizationName", "orgName", "companyName"]);
+    final person = _firstText(_sponsor, ["name", "fullName", "userName"]);
+    final orgTitle =
+    org.isNotEmpty ? org : (person.isNotEmpty ? person : fallbackName);
+    final orgType = _firstText(
+        _sponsor, ["organizationType", "orgType", "sponsorType", "category"]);
+    final email = _firstText(_sponsor, ["email"]);
+    final phone =
+    _firstText(_sponsor, ["phone", "phoneNumber", "mobile", "contact"]);
+    final website = _firstText(_sponsor, ["website", "websiteUrl"]);
+    final location =
+    _firstText(_sponsor, ["address", "location", "city", "state"]);
+    final about = _firstText(_sponsor, ["about", "description", "bio"]);
+
+    final status = _liveStatus ?? (widget.data["status"] ?? "").toString();
+    final applied = status == "applied";
+    final sponsorLoading = _sponsor == null && _sponsorId.isNotEmpty;
+    final items = _items;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ---------- header ----------
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(22, 22, 14, 20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [navy, navy.withOpacity(0.86)],
+            ),
+            border: Border(bottom: BorderSide(color: gold, width: 3)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 700),
+                curve: Curves.elasticOut,
+                builder: (context, v, child) =>
+                    Transform.scale(scale: v, child: child),
+                child: Container(
+                  width: 58,
+                  height: 58,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: gold,
+                    boxShadow: [
+                      BoxShadow(color: gold.withOpacity(0.5), blurRadius: 16),
+                    ],
+                  ),
+                  child: Text(
+                    orgTitle.isNotEmpty ? orgTitle[0].toUpperCase() : "S",
+                    style: TextStyle(
+                      color: navy,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 9, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: gold.withOpacity(0.22),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        "SCHOLARSHIP INVITATION",
+                        style: TextStyle(
+                          color: gold,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.9,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      orgTitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      "has invited you to apply",
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: _close,
+                icon: Icon(Icons.close_rounded,
+                    color: Colors.white.withOpacity(0.8)),
+              ),
+            ],
+          ),
+        ),
+
+        // ---------- body ----------
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (applied)
+                  FadeSlideIn(
+                    child: Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: AppColors.success.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle_rounded,
+                              color: AppColors.success, size: 20),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              "You have applied. The sponsor has been notified.",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 80),
+                  child: Text(
+                    (widget.data["body"] ?? "").toString(),
+                    style: AppTextStyles.subtitle.copyWith(
+                      fontSize: 13.5,
+                      color: AppColors.textPrimary,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // ----- sponsor details -----
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 160),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.check_circle_rounded,
-                          size: 16, color: AppColors.success),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(t)),
+                      _sectionLabel("ABOUT THE SPONSOR"),
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: _boxDeco(),
+                        child: sponsorLoading
+                            ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2.4),
+                            ),
+                          ),
+                        )
+                            : Column(
+                          children: [
+                            _InfoRow(
+                                icon: Icons.apartment_rounded,
+                                label: "Organisation",
+                                value: org.isNotEmpty ? org : orgTitle),
+                            _InfoRow(
+                                icon: Icons.category_rounded,
+                                label: "Type",
+                                value: orgType),
+                            _InfoRow(
+                                icon: Icons.person_rounded,
+                                label: "Contact person",
+                                value: person == orgTitle ? "" : person),
+                            _InfoRow(
+                                icon: Icons.email_rounded,
+                                label: "Email",
+                                value: email),
+                            _InfoRow(
+                                icon: Icons.phone_rounded,
+                                label: "Phone",
+                                value: phone),
+                            _InfoRow(
+                                icon: Icons.language_rounded,
+                                label: "Website",
+                                value: website),
+                            _InfoRow(
+                                icon: Icons.location_on_rounded,
+                                label: "Location",
+                                value: location),
+                            _InfoRow(
+                                icon: Icons.info_outline_rounded,
+                                label: "About",
+                                value: about),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 22),
+
+                // ----- matched scholarships -----
+                Row(
+                  children: [
+                    _sectionLabel("SCHOLARSHIPS YOU MATCH (${_titles.length})"),
+                    const SizedBox(width: 10),
+                    const _LiveDot(),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Tap a scholarship to see its requirements and apply.",
+                  style: TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 10),
+                if (!_schLoaded)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 18),
+                    child: Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.4),
+                      ),
+                    ),
+                  )
+                else
+                  for (var i = 0; i < items.length; i++)
+                    _scholarshipTile(items[i], i),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+
+        // ---------- footer ----------
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            border: Border(
+              top: BorderSide(color: Colors.black.withOpacity(0.06)),
+            ),
+          ),
+          child: Row(
+            children: [
+              TextButton(onPressed: _close, child: const Text("Close")),
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: _browse,
+                icon: const Icon(Icons.search_rounded, size: 18),
+                label: const Text("Browse Scholarships"),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  backgroundColor: navy,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  BoxDecoration _boxDeco({Color? border}) => BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(14),
+    border: Border.all(color: border ?? Colors.black.withOpacity(0.06)),
+  );
+
+  Widget _sectionLabel(String t) => Text(
+    t,
+    style: TextStyle(
+      fontSize: 11.5,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0.9,
+      color: AppColors.secondary,
+    ),
+  );
+
+  // ---------------------------------------------------------
+  // One scholarship: collapsed summary + expandable requirements
+  // ---------------------------------------------------------
+  Widget _scholarshipTile(_Matched it, int index) {
+    final d = it.doc;
+    final key = it.id ?? it.title;
+    final isOpen = _open.contains(key);
+
+    final amount = _firstText(d, ["amount"]);
+    final deadline = _firstText(d, ["lastDate", "deadline"]);
+    final cat = _firstText(d, ["scholarshipType", "category", "type"]);
+
+    final applied = it.id != null && _appliedIds.contains(it.id);
+    final elig = _eligible(d);
+
+    String? badge;
+    Color badgeColor = AppColors.primary;
+    IconData badgeIcon = Icons.check_circle_rounded;
+    if (applied) {
+      badge = "Applied";
+      badgeColor = AppColors.primary;
+      badgeIcon = Icons.task_alt_rounded;
+    } else if (elig == true) {
+      badge = "You're eligible";
+      badgeColor = AppColors.success;
+    } else if (elig == false) {
+      badge = "Not eligible";
+      badgeColor = AppColors.error;
+      badgeIcon = Icons.info_rounded;
+    }
+
+    return FadeSlideIn(
+      delay: Duration(milliseconds: 90 * (index + 3)),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: _boxDeco(
+          border: isOpen
+              ? AppColors.secondary.withOpacity(0.7)
+              : Colors.black.withOpacity(0.06),
+        ),
+        child: Column(
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: d == null
+                  ? null
+                  : () => setState(() {
+                isOpen ? _open.remove(key) : _open.add(key);
+              }),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child:
+                      Icon(Icons.school_rounded, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            it.title,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 14),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 14,
+                            runSpacing: 4,
+                            children: [
+                              if (amount.isNotEmpty)
+                                _miniInfo(
+                                    Icons.currency_rupee_rounded, amount),
+                              if (deadline.isNotEmpty)
+                                _miniInfo(Icons.event_rounded,
+                                    "Last date $deadline"),
+                              if (cat.isNotEmpty)
+                                _miniInfo(Icons.label_rounded, cat),
+                            ],
+                          ),
+                          if (badge != null) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 9, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: badgeColor.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(badgeIcon,
+                                      size: 13, color: badgeColor),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    badge,
+                                    style: TextStyle(
+                                      color: badgeColor,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (d != null)
+                      AnimatedRotation(
+                        turns: isOpen ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 250),
+                        child: Icon(Icons.keyboard_arrow_down_rounded,
+                            color: AppColors.textSecondary),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topCenter,
+              child: isOpen
+                  ? _tileDetails(it, applied: applied, elig: elig)
+                  : const SizedBox(width: double.infinity, height: 0),
+            ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext),
-          child: const Text("Close"),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
+    );
+  }
+
+  Widget _tileDetails(_Matched it,
+      {required bool applied, required bool? elig}) {
+    final d = it.doc ?? {};
+    final reqs = _requirements(d);
+    final docs = _requiredDocs(d);
+    final desc = _firstText(d, ["description", "about", "details"]);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Divider(color: Colors.black.withOpacity(0.08), height: 1),
+          const SizedBox(height: 12),
+          if (desc.isNotEmpty) ...[
+            Text(desc,
+                style: TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: AppColors.textPrimary)),
+            const SizedBox(height: 14),
+          ],
+          if (reqs.isNotEmpty) ...[
+            _sectionLabel("ELIGIBILITY REQUIREMENTS"),
+            const SizedBox(height: 6),
+            for (final r in reqs)
+              _InfoRow(icon: r.icon, label: r.label, value: r.value),
+            const SizedBox(height: 10),
+          ],
+          if (docs.isNotEmpty) ...[
+            _sectionLabel("DOCUMENTS TO UPLOAD"),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final doc in docs)
+                  Container(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.07),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.description_rounded,
+                            size: 14, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        Text(doc,
+                            style: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (reqs.isEmpty && docs.isEmpty && desc.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                "The sponsor has not listed detailed requirements. "
+                    "Open the full details to read more.",
+                style:
+                TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+              ),
+            ),
+          if (elig == false)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.error.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                "Your profile does not meet the criteria for this "
+                    "scholarship.",
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.error),
+              ),
+            ),
+          Row(
+            children: [
+              if (it.id != null)
+                OutlinedButton.icon(
+                  onPressed: () => _openDetails(it.id!),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  label: const Text("Full details"),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    foregroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              const Spacer(),
+              if (applied)
+                ElevatedButton.icon(
+                  onPressed: null,
+                  icon: const Icon(Icons.task_alt_rounded, size: 17),
+                  label: const Text("Already applied"),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                  ),
+                )
+              else if (elig != false && it.id != null)
+                ElevatedButton.icon(
+                  onPressed: () => _applyTo(it.id!),
+                  icon: const Icon(Icons.send_rounded, size: 17),
+                  label: const Text("Apply Now"),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: AppColors.primary,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+            ],
           ),
-          onPressed: () {
-            Navigator.pop(dialogContext);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const AllScholarshipsScreen()),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniInfo(IconData icon, String text) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 14, color: AppColors.textSecondary),
+      const SizedBox(width: 4),
+      Text(text,
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+    ],
+  );
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _InfoRow(
+      {required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppColors.primary),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 112,
+            child: Text(label,
+                style: TextStyle(
+                    fontSize: 12.5, color: AppColors.textSecondary)),
+          ),
+          Expanded(
+            child: SelectableText(
+              value,
+              style:
+              const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Requirement fields. Several common field names are tried for each row,
+// only the ones that exist in the scholarship document are shown.
+List<({IconData icon, String label, String value})> _requirements(
+    Map<String, dynamic> d) {
+  final specs = <(IconData, String, List<String>)>[
+    (Icons.grade_rounded, "Minimum marks", [
+      "minPercentage", "minMarks", "minimumPercentage", "minCgpa",
+      "minGpa", "cgpa", "percentage", "marksRequired", "minAcademicScore"
+    ]),
+    (Icons.account_balance_wallet_rounded, "Max family income", [
+      "maxIncome", "incomeLimit", "maxFamilyIncome", "familyIncome",
+      "annualIncome", "incomeCeiling"
+    ]),
+    (Icons.menu_book_rounded, "Course / Branch", [
+      "course", "courses", "branch", "branches", "department",
+      "eligibleCourses"
+    ]),
+    (Icons.timeline_rounded, "Year of study", [
+      "year", "yearOfStudy", "eligibleYear", "eligibleYears"
+    ]),
+    (Icons.workspace_premium_rounded, "Education level", [
+      "educationLevel", "level", "degree", "qualification"
+    ]),
+    (Icons.wc_rounded, "Gender", ["gender"]),
+    (Icons.groups_rounded, "Community", [
+      "community", "caste", "reservation", "eligibleCommunity"
+    ]),
+    (Icons.location_city_rounded, "State / Region", ["state", "region"]),
+    (Icons.rule_rounded, "Other criteria", [
+      "eligibility", "eligibilityCriteria", "criteria", "requirements",
+      "terms"
+    ]),
+  ];
+
+  final out = <({IconData icon, String label, String value})>[];
+  for (final s in specs) {
+    var v = _firstText(d, s.$3);
+    if (v.isEmpty) continue;
+    if (s.$2 == "Max family income" && !v.startsWith("₹")) v = "₹$v";
+    out.add((icon: s.$1, label: s.$2, value: v));
+  }
+  return out;
+}
+
+List<String> _requiredDocs(Map<String, dynamic> d) {
+  for (final k in [
+    "requiredDocuments", "requiredDocs", "documentsRequired", "documents"
+  ]) {
+    final v = d[k];
+    if (v is List && v.isNotEmpty) {
+      return v.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+    }
+    if (v is String && v.trim().isNotEmpty) {
+      return v
+          .split(RegExp(r"[,\n;]"))
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+  }
+  return [];
+}
+
+
+// =========================================================
+// FULL SCHOLARSHIP DETAILS (opened from an invitation) + APPLY BUTTON
+// =========================================================
+
+DateTime? _parseDate(dynamic v) {
+  if (v is Timestamp) return v.toDate();
+  if (v is String) {
+    final p = v.trim().split(RegExp(r"[/\-.]"));
+    if (p.length == 3) {
+      final a = int.tryParse(p[0]);
+      final b = int.tryParse(p[1]);
+      final c = int.tryParse(p[2]);
+      if (a != null && b != null && c != null) {
+        if (p[0].length == 4) return DateTime(a, b, c); // yyyy-mm-dd
+        return DateTime(c, b, a); // dd/mm/yyyy
+      }
+    }
+  }
+  return null;
+}
+
+Widget _sectionTitle(String t) => Text(
+  t,
+  style: TextStyle(
+    fontSize: 11.5,
+    fontWeight: FontWeight.w800,
+    letterSpacing: 0.9,
+    color: AppColors.secondary,
+  ),
+);
+
+class InviteScholarshipDetailsScreen extends StatelessWidget {
+  final String scholarshipId;
+  final String? sponsorName;
+
+  const InviteScholarshipDetailsScreen({
+    super.key,
+    required this.scholarshipId,
+    this.sponsorName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final db = FirebaseFirestore.instance;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: db.collection("scholarships").doc(scholarshipId).snapshots(),
+        builder: (context, schSnap) {
+          if (schSnap.hasError) {
+            return _message(context, "Could not load this scholarship.\n"
+                "${schSnap.error}");
+          }
+          if (!schSnap.hasData) {
+            return Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
             );
-          },
-          child: const Text("Browse Scholarships"),
+          }
+          final d = schSnap.data!.data();
+          if (d == null) {
+            return _message(
+                context, "This scholarship is no longer available.");
+          }
+
+          return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: uid == null ? null : db.collection("users").doc(uid).snapshots(),
+            builder: (context, stuSnap) {
+              final student = stuSnap.data?.data() ?? {};
+
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: uid == null
+                    ? null
+                    : db
+                    .collection("applications")
+                    .where("studentId", isEqualTo: uid)
+                    .snapshots(),
+                builder: (context, appSnap) {
+                  final applied = (appSnap.data?.docs ?? []).any((a) =>
+                  a.data()["scholarshipId"]?.toString() == scholarshipId);
+                  return _content(context, d, student, applied);
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _message(BuildContext context, String text) {
+    return SafeArea(
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back),
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(text,
+                    textAlign: TextAlign.center, style: AppTextStyles.subtitle),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _content(BuildContext context, Map<String, dynamic> d,
+      Map<String, dynamic> student, bool applied) {
+    final title = _firstText(d, ["title"]);
+    final amount = _firstText(d, ["amount"]);
+    final lastDateText = _firstText(d, ["lastDate", "deadline"]);
+    final cat = _firstText(d, ["scholarshipType", "category", "type"]);
+    final desc = _firstText(d, ["description", "about", "details"]);
+    final reqs = _requirements(d);
+    final docs = _requiredDocs(d);
+
+    final last = _parseDate(d["lastDate"] ?? d["deadline"]);
+    final today = DateTime.now();
+    final closed = last != null &&
+        DateTime(last.year, last.month, last.day)
+            .isBefore(DateTime(today.year, today.month, today.day));
+    final daysLeft = last == null
+        ? null
+        : DateTime(last.year, last.month, last.day)
+        .difference(DateTime(today.year, today.month, today.day))
+        .inDays;
+
+    bool? eligible;
+    if (student.isNotEmpty) {
+      try {
+        eligible = isStudentEligibleForScholarship(d, student);
+      } catch (e) {
+        debugPrint("DETAILS eligibility error: $e");
+      }
+    }
+
+    final canApply = !applied && !closed && eligible != false;
+
+    String statusText;
+    Color statusColor;
+    IconData statusIcon;
+    if (applied) {
+      statusText = "You have already applied";
+      statusColor = AppColors.primary;
+      statusIcon = Icons.task_alt_rounded;
+    } else if (closed) {
+      statusText = "Applications are closed";
+      statusColor = AppColors.error;
+      statusIcon = Icons.event_busy_rounded;
+    } else if (eligible == false) {
+      statusText = "You don't meet the criteria";
+      statusColor = AppColors.error;
+      statusIcon = Icons.info_rounded;
+    } else if (eligible == true) {
+      statusText = "You're eligible to apply";
+      statusColor = AppColors.success;
+      statusIcon = Icons.verified_rounded;
+    } else {
+      statusText = "Check the requirements below";
+      statusColor = AppColors.textSecondary;
+      statusIcon = Icons.rule_rounded;
+    }
+
+    final sponsor = sponsorName ??
+        _firstText(d, ["sponsorName", "organization", "organizationName"]);
+
+    Widget card(List<Widget> children) => Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.black.withOpacity(0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+
+    Widget chip(IconData icon, String text) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.secondary),
+          const SizedBox(width: 6),
+          Text(text,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+
+    return Column(
+      children: [
+        // ---------- header ----------
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.primary, AppColors.primary.withOpacity(0.84)],
+            ),
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(30),
+              bottomRight: Radius.circular(30),
+            ),
+            border: Border(
+                bottom: BorderSide(color: AppColors.secondary, width: 3)),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 16, 22),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 820),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.arrow_back,
+                                color: Colors.white),
+                          ),
+                          Text(
+                            "Scholarship Details",
+                            style: AppTextStyles.title.copyWith(
+                                fontSize: 16, color: Colors.white),
+                          ),
+                          const Spacer(),
+                          const _LiveDot(),
+                        ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12, top: 6),
+                        child: FadeSlideIn(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              if (sponsor.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text("by $sponsor",
+                                    style: TextStyle(
+                                        color: Colors.white.withOpacity(0.8),
+                                        fontSize: 13)),
+                              ],
+                              const SizedBox(height: 14),
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 8,
+                                children: [
+                                  if (amount.isNotEmpty)
+                                    chip(Icons.currency_rupee_rounded, amount),
+                                  if (lastDateText.isNotEmpty)
+                                    chip(Icons.event_rounded,
+                                        "Last date $lastDateText"),
+                                  if (cat.isNotEmpty)
+                                    chip(Icons.label_rounded, cat),
+                                  if (daysLeft != null)
+                                    chip(
+                                      Icons.hourglass_bottom_rounded,
+                                      closed
+                                          ? "Closed"
+                                          : (daysLeft == 0
+                                          ? "Last day today"
+                                          : "$daysLeft days left"),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // ---------- body ----------
+        Expanded(
+          child: SingleChildScrollView(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 820),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                  child: Column(
+                    children: [
+                      if (desc.isNotEmpty)
+                        FadeSlideIn(
+                          delay: const Duration(milliseconds: 80),
+                          child: card([
+                            _sectionTitle("ABOUT THIS SCHOLARSHIP"),
+                            const SizedBox(height: 10),
+                            Text(desc,
+                                style: TextStyle(
+                                    fontSize: 13.5,
+                                    height: 1.5,
+                                    color: AppColors.textPrimary)),
+                          ]),
+                        ),
+                      FadeSlideIn(
+                        delay: const Duration(milliseconds: 160),
+                        child: card([
+                          _sectionTitle("ELIGIBILITY REQUIREMENTS"),
+                          const SizedBox(height: 8),
+                          if (reqs.isEmpty)
+                            Text(
+                              "The sponsor has not listed detailed requirements.",
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: AppColors.textSecondary),
+                            )
+                          else
+                            for (final r in reqs)
+                              _InfoRow(
+                                  icon: r.icon,
+                                  label: r.label,
+                                  value: r.value),
+                        ]),
+                      ),
+                      if (docs.isNotEmpty)
+                        FadeSlideIn(
+                          delay: const Duration(milliseconds: 240),
+                          child: card([
+                            _sectionTitle("DOCUMENTS TO UPLOAD"),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final doc in docs)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 11, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      color:
+                                      AppColors.primary.withOpacity(0.07),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.description_rounded,
+                                            size: 15,
+                                            color: AppColors.primary),
+                                        const SizedBox(width: 6),
+                                        Text(doc,
+                                            style: const TextStyle(
+                                                fontSize: 12.5,
+                                                fontWeight:
+                                                FontWeight.w600)),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ]),
+                        ),
+                      FadeSlideIn(
+                        delay: const Duration(milliseconds: 320),
+                        child: card([
+                          _sectionTitle("HOW TO APPLY"),
+                          const SizedBox(height: 12),
+                          _step(1, "Check your eligibility",
+                              "Make sure you meet every requirement above."),
+                          _step(2, "Upload your documents",
+                              "Keep the listed documents ready as clear PDFs or images."),
+                          _step(3, "Write your statement of purpose",
+                              "Briefly explain why you deserve this scholarship."),
+                          _step(4, "Submit & track",
+                              "Follow verification and approval status in My Applications."),
+                        ]),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // ---------- sticky apply bar ----------
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 16,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 820),
+                child: Row(
+                  children: [
+                    Icon(statusIcon, color: statusColor, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        statusText,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _PulseGlow(
+                      active: canApply,
+                      radius: 14,
+                      margin: EdgeInsets.zero,
+                      child: ElevatedButton.icon(
+                        onPressed:
+                        canApply ? () => _confirmApply(context, docs) : null,
+                        icon: Icon(
+                            applied
+                                ? Icons.task_alt_rounded
+                                : Icons.send_rounded,
+                            size: 18),
+                        label: Text(
+                          applied
+                              ? "Already Applied"
+                              : (closed
+                              ? "Applications Closed"
+                              : (eligible == false
+                              ? "Not Eligible"
+                              : "Apply for this Scholarship")),
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: AppColors.primary,
+                          disabledBackgroundColor: Colors.black12,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 22, vertical: 16),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _step(int n, String title, String sub) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            shape: BoxShape.circle,
+          ),
+          child: Text("$n",
+              style: TextStyle(
+                  color: AppColors.secondary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 13.5)),
+              const SizedBox(height: 2),
+              Text(sub,
+                  style: TextStyle(
+                      fontSize: 12.5, color: AppColors.textSecondary)),
+            ],
+          ),
         ),
       ],
     ),
   );
+
+  // Pre-apply checklist, then continue into the existing apply flow.
+  void _confirmApply(BuildContext context, List<String> docs) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text("Ready to apply?"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Keep these ready before you continue:"),
+            const SizedBox(height: 10),
+            if (docs.isEmpty)
+              const Text("• Your academic and income documents")
+            else
+              for (final d in docs) Text("• $d"),
+            const SizedBox(height: 10),
+            const Text("• A short statement of purpose"),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Not now"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(0, 44),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _startApply(context);
+            },
+            child: const Text("Continue"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // >>> The ONE place that opens the real apply flow. <<<
+  // Opens the existing apply screen filtered to ONLY this scholarship.
+  void _startApply(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            EligibleScholarshipsScreen(scholarshipId: scholarshipId),
+      ),
+    );
+  }
+}
+
+// =========================================================
+// BLINKING CHIP  ("NEW INVITATION" on the list card)
+// =========================================================
+
+class _BlinkChip extends StatefulWidget {
+  final String text;
+  const _BlinkChip(this.text);
+
+  @override
+  State<_BlinkChip> createState() => _BlinkChipState();
+}
+
+class _BlinkChipState extends State<_BlinkChip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 850),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.4, end: 1).animate(_c),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        decoration: BoxDecoration(
+          color: AppColors.secondary,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          widget.text,
+          style: TextStyle(
+            color: AppColors.primary,
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =========================================================
+// SMALL ANIMATION HELPERS
+// =========================================================
+
+/// Fade + slide-up entrance. Use it anywhere: FadeSlideIn(delay: ..., child: ...)
+class FadeSlideIn extends StatefulWidget {
+  final Widget child;
+  final Duration delay;
+  final Duration duration;
+  final double dy; // fraction of the child's height
+
+  const FadeSlideIn({
+    super.key,
+    required this.child,
+    this.delay = Duration.zero,
+    this.duration = const Duration(milliseconds: 520),
+    this.dy = 0.12,
+  });
+
+  @override
+  State<FadeSlideIn> createState() => _FadeSlideInState();
+}
+
+class _FadeSlideInState extends State<FadeSlideIn> {
+  bool _go = false;
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer(widget.delay, () {
+      if (mounted) setState(() => _go = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      opacity: _go ? 1 : 0,
+      duration: widget.duration,
+      curve: Curves.easeOut,
+      child: AnimatedSlide(
+        offset: _go ? Offset.zero : Offset(0, widget.dy),
+        duration: widget.duration,
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+/// Tiny blinking green dot + "LIVE" label (data updates in real time)
+class _LiveDot extends StatefulWidget {
+  const _LiveDot();
+
+  @override
+  State<_LiveDot> createState() => _LiveDotState();
+}
+
+class _LiveDotState extends State<_LiveDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.35, end: 1).animate(_c),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+                color: AppColors.success, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 4),
+          Text("LIVE",
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: AppColors.success)),
+        ],
+      ),
+    );
+  }
+}
+
+// =========================================================
+// PULSING GOLD GLOW (used for unread invitation cards)
+// =========================================================
+
+class _PulseGlow extends StatefulWidget {
+  final bool active;
+  final Widget child;
+  final double radius;
+  final EdgeInsets margin;
+  const _PulseGlow({
+    required this.active,
+    required this.child,
+    this.radius = 18,
+    this.margin = const EdgeInsets.only(bottom: 12),
+  });
+
+  @override
+  State<_PulseGlow> createState() => _PulseGlowState();
+}
+
+class _PulseGlowState extends State<_PulseGlow>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1300),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.active) {
+      return Container(
+        margin: widget.margin,
+        child: widget.child,
+      );
+    }
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, child) {
+        final t = Curves.easeInOut.transform(_c.value);
+        return Container(
+          margin: widget.margin,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(widget.radius),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.secondary.withOpacity(0.40 + 0.50 * t),
+                blurRadius: 14 + 22 * t,
+                spreadRadius: 2 + 4 * t,
+              ),
+            ],
+          ),
+          child: child,
+        );
+      },
+      child: widget.child,
+    );
+  }
+}
+
+// =========================================================
+// DASHBOARD HIGHLIGHT CARD  (blinking / glowing pending invitation)
+// Add to the student dashboard:  const InviteHighlightCard()
+// Disappears automatically once the student applies.
+// =========================================================
+
+class InviteHighlightCard extends StatefulWidget {
+  const InviteHighlightCard({super.key});
+
+  @override
+  State<InviteHighlightCard> createState() => _InviteHighlightCardState();
+}
+
+class _InviteHighlightCardState extends State<InviteHighlightCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const SizedBox.shrink();
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: NotificationService().streamFor(uid),
+      builder: (context, snap) {
+        final invites = (snap.data?.docs ?? []).where((d) {
+          final m = d.data();
+          return (m["audience"] ?? "student") == "student" &&
+              m["type"] == "invite" &&
+              m["status"] != "applied";
+        }).toList();
+
+        if (invites.isEmpty) return const SizedBox.shrink();
+
+        DateTime ts(QueryDocumentSnapshot<Map<String, dynamic>> d) {
+          final t = d.data()["createdAt"];
+          return t is Timestamp ? t.toDate() : DateTime.now();
+        }
+
+        invites.sort((a, b) => ts(b).compareTo(ts(a)));
+        final first = invites.first;
+        final data = first.data();
+        final anyUnread = invites.any((d) => d.data()["isRead"] != true);
+
+        final sponsor = (data["sponsorName"] ?? "A sponsor").toString();
+        final n = (data["scholarshipTitles"] is List)
+            ? (data["scholarshipTitles"] as List).length
+            : 0;
+        final more = invites.length - 1;
+
+        final gold = AppColors.secondary;
+        final navy = AppColors.primary;
+
+        return AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) {
+            final t = Curves.easeInOut.transform(_c.value);
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () async {
+                  try {
+                    if (data["isRead"] != true) {
+                      await NotificationService().markRead(first.id);
+                    }
+                  } catch (_) {}
+                  if (context.mounted) showInviteDialog(context, data);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [navy, navy.withOpacity(0.88)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: gold.withOpacity(0.6 + 0.4 * t), width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: gold.withOpacity(0.25 + 0.35 * t),
+                        blurRadius: 14 + 16 * t,
+                        spreadRadius: 1 + 2 * t,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            decoration:
+                            BoxDecoration(shape: BoxShape.circle, color: gold),
+                            child: Icon(Icons.mail_rounded,
+                                color: navy, size: 26),
+                          ),
+                          if (anyUnread)
+                            Positioned(
+                              right: -2,
+                              top: -2,
+                              child: Opacity(
+                                opacity: 0.35 + 0.65 * t,
+                                child: Container(
+                                  width: 14,
+                                  height: 14,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.error,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 2),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Opacity(
+                              opacity: 0.55 + 0.45 * t,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: gold.withOpacity(0.22),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  anyUnread
+                                      ? "NEW INVITATION"
+                                      : "PENDING INVITATION",
+                                  style: TextStyle(
+                                    color: gold,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              "$sponsor invited you to apply!",
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              "$n matching scholarship${n == 1 ? '' : 's'}"
+                                  "${more > 0 ? '  •  +$more more invitation${more == 1 ? '' : 's'}' : ''}"
+                                  "  •  Tap to view details",
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.82),
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: gold,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          "View",
+                          style: TextStyle(
+                            color: navy,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
 // =========================================================
@@ -280,9 +2222,8 @@ class _InviteBannerHostState extends State<InviteBannerHost> {
   @override
   Widget build(BuildContext context) {
     return Stack(
-      fit: StackFit.expand,
       children: [
-        widget.child,
+        Positioned.fill(child: widget.child),
         if (_currentData != null)
           Positioned(
             top: 0,
@@ -300,10 +2241,13 @@ class _InviteBannerHostState extends State<InviteBannerHost> {
                       offset: _visible ? Offset.zero : const Offset(0, -1.5),
                       duration: const Duration(milliseconds: 450),
                       curve: _visible ? Curves.easeOutBack : Curves.easeIn,
-                      child: AnimatedOpacity(
-                        opacity: _visible ? 1 : 0,
-                        duration: const Duration(milliseconds: 300),
-                        child: _banner(_currentData!),
+                      child: IgnorePointer(
+                        ignoring: !_visible,
+                        child: AnimatedOpacity(
+                          opacity: _visible ? 1 : 0,
+                          duration: const Duration(milliseconds: 300),
+                          child: _banner(_currentData!),
+                        ),
                       ),
                     ),
                   ),
@@ -442,6 +2386,7 @@ class _InviteBannerHostState extends State<InviteBannerHost> {
                       ElevatedButton(
                         onPressed: _view,
                         style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(0, 44),
                           backgroundColor: gold,
                           foregroundColor: AppColors.primary,
                           elevation: 0,
@@ -605,11 +2550,15 @@ class NotificationScreen extends StatelessWidget {
 
     return Column(
       children: [
-        for (final doc in docs)
-          _NotificationCard(
-            id: doc.id,
-            data: doc.data(),
-            service: service,
+        for (var i = 0; i < docs.length; i++)
+          FadeSlideIn(
+            key: ValueKey("fs_${docs[i].id}"),
+            delay: Duration(milliseconds: 70 * math.min(i, 8)),
+            child: _NotificationCard(
+              id: docs[i].id,
+              data: docs[i].data(),
+              service: service,
+            ),
           ),
       ],
     );
@@ -748,6 +2697,8 @@ class _NotificationCard extends StatelessWidget {
     switch ((data["type"] ?? "info").toString()) {
       case "invite":
         return (icon: Icons.mail_rounded, color: AppColors.secondary);
+      case "invite_accepted":
+        return (icon: Icons.how_to_reg_rounded, color: AppColors.success);
       case "applied":
       case "application_received":
         return (icon: Icons.description_rounded, color: AppColors.primary);
@@ -820,6 +2771,8 @@ class _NotificationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = _style;
     final unread = data["isRead"] != true;
+    final pendingInvite = (data["type"] ?? "") == "invite" &&
+        (data["status"] ?? "") != "applied";
 
     return Dismissible(
       key: ValueKey(id),
@@ -835,89 +2788,117 @@ class _NotificationCard extends StatelessWidget {
         child: const Icon(Icons.delete_rounded, color: Colors.white),
       ),
       onDismissed: (_) => service.delete(id),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: unread
-                ? style.color.withOpacity(0.45)
-                : Colors.transparent,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 5),
+      child: _PulseGlow(
+        active: (data["type"] ?? "") == "invite" &&
+            (data["status"] ?? "") != "applied",
+        child: Container(
+          decoration: BoxDecoration(
+            color: pendingInvite ? null : AppColors.card,
+            gradient: pendingInvite
+                ? const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFFFF3D1), Colors.white],
+            )
+                : null,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: pendingInvite
+                  ? AppColors.secondary
+                  : (unread
+                  ? style.color.withOpacity(0.45)
+                  : Colors.transparent),
+              width: pendingInvite ? 2 : 1,
             ),
-          ],
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () => _open(context),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: style.color.withOpacity(0.14),
-                    borderRadius: BorderRadius.circular(13),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => _open(context),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: style.color.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: Icon(style.icon, color: style.color),
                   ),
-                  child: Icon(style.icon, color: style.color),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              (data["title"] ?? "Notification").toString(),
-                              style: AppTextStyles.title.copyWith(
-                                fontSize: 14.5,
-                                color: AppColors.textPrimary,
-                                fontWeight:
-                                unread ? FontWeight.w800 : FontWeight.w600,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (pendingInvite) ...[
+                          const _BlinkChip("NEW INVITATION"),
+                          const SizedBox(height: 8),
+                        ],
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                (data["title"] ?? "Notification").toString(),
+                                style: AppTextStyles.title.copyWith(
+                                  fontSize: 14.5,
+                                  color: AppColors.textPrimary,
+                                  fontWeight:
+                                  unread ? FontWeight.w800 : FontWeight.w600,
+                                ),
                               ),
+                            ),
+                            if (unread)
+                              Container(
+                                width: 9,
+                                height: 9,
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          (data["body"] ?? "").toString(),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.subtitle.copyWith(fontSize: 13),
+                        ),
+                        if (pendingInvite) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            "View sponsor details & apply  →",
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12.5,
                             ),
                           ),
-                          if (unread)
-                            Container(
-                              width: 9,
-                              height: 9,
-                              decoration: BoxDecoration(
-                                color: AppColors.secondary,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
                         ],
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        (data["body"] ?? "").toString(),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.subtitle.copyWith(fontSize: 13),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _timeAgo(),
-                        style: AppTextStyles.subtitle.copyWith(
-                          fontSize: 11.5,
-                          color: AppColors.textSecondary,
+                        const SizedBox(height: 8),
+                        Text(
+                          _timeAgo(),
+                          style: AppTextStyles.subtitle.copyWith(
+                            fontSize: 11.5,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
