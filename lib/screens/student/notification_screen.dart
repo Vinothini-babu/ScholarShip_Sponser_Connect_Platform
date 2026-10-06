@@ -10,15 +10,40 @@ import '../../core/constants/app_text_styles.dart';
 import '../../services/notification_service.dart';
 import 'all_scholarships_screen.dart';
 import 'my_applications_screen.dart';
-import 'eligible_scholarships_screen.dart';
+import 'scholarship_applications_screen.dart';
+import 'scholarship_info_screen.dart';
 import '../../utils/eligibility_utils.dart';
 
 // =========================================================
 // BELL (use in the student dashboard header)
 // =========================================================
 
-class NotificationBell extends StatelessWidget {
+class NotificationBell extends StatefulWidget {
   const NotificationBell({super.key});
+
+  @override
+  State<NotificationBell> createState() => _NotificationBellState();
+}
+
+class _NotificationBellState extends State<NotificationBell>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1800),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  // quick ringing swing in the first third of every cycle, then rest
+  double _swing(double t) {
+    if (t > 0.35) return 0;
+    final p = t / 0.35;
+    return math.sin(p * math.pi * 4) * 0.42 * (1 - p);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,52 +54,83 @@ class NotificationBell extends StatelessWidget {
       stream: NotificationService().unreadCount(uid),
       builder: (context, snap) {
         final count = snap.data ?? 0;
+        final active = count > 0;
 
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Material(
-              color: Colors.white.withOpacity(0.16),
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const NotificationScreen()),
-                ),
-                child: const Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Icon(Icons.notifications_rounded,
-                      color: Colors.white, size: 22),
-                ),
-              ),
-            ),
-            if (count > 0)
-              Positioned(
-                right: -2,
-                top: -2,
-                child: Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  constraints:
-                  const BoxConstraints(minWidth: 18, minHeight: 18),
-                  decoration: BoxDecoration(
-                    color: AppColors.error,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white, width: 1.5),
+        return AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) {
+            final t = _c.value;
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                if (active)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Transform.scale(
+                        scale: 1 + 0.9 * t,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.secondary
+                                  .withOpacity((1 - t) * 0.9),
+                              width: 2.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                  child: Text(
-                    count > 99 ? "99+" : "$count",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
+                Material(
+                  color: active
+                      ? AppColors.secondary.withOpacity(0.38)
+                      : Colors.white.withOpacity(0.16),
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const NotificationScreen()),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Transform.rotate(
+                        angle: active ? _swing(t) : 0,
+                        child: const Icon(Icons.notifications_rounded,
+                            color: Colors.white, size: 22),
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+                if (active)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 2),
+                      constraints:
+                      const BoxConstraints(minWidth: 18, minHeight: 18),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text(
+                        count > 99 ? "99+" : "$count",
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         );
       },
     );
@@ -110,6 +166,50 @@ String _val(dynamic v) {
   if (v is bool) return v ? "Yes" : "No";
   return v.toString().trim();
 }
+
+const List<String> _legacyDefaultDocs = [
+  "Marksheet",
+  "ID Proof",
+  "Income Certificate",
+  "College ID",
+];
+
+String _padDate(dynamic v) {
+  if (v is Timestamp) {
+    final d = v.toDate();
+    return "${d.day.toString().padLeft(2, '0')}/"
+        "${d.month.toString().padLeft(2, '0')}/${d.year}";
+  }
+  return _val(v);
+}
+
+/// The existing documents + SOP apply form for one scholarship.
+Widget _applicationForm(String id, Map<String, dynamic> d) {
+  final docs = (d["requiredDocuments"] is List &&
+      (d["requiredDocuments"] as List).isNotEmpty)
+      ? (d["requiredDocuments"] as List).map((e) => e.toString()).toList()
+      : _legacyDefaultDocs;
+  final title = _val(d["title"]);
+  return ScholarshipApplicationScreen(
+    scholarshipId: id,
+    title: title.isEmpty ? "Scholarship" : title,
+    amount: _val(d["amount"]),
+    lastDate: _padDate(d["lastDate"]),
+    eligibility: _val(d["eligibility"]),
+    requiredDocuments: docs,
+  );
+}
+
+String _inviteStatus(Map<String, dynamic> m) =>
+    (m["status"] ?? "invited").toString();
+
+/// An invitation that still needs the student's attention
+/// (not yet applied, not declined).
+bool _isPendingInvite(Map<String, dynamic> m) =>
+    (m["type"] ?? "") == "invite" &&
+        _inviteStatus(m) != "applied" &&
+        _inviteStatus(m) != "declined" &&
+        _inviteStatus(m) != "withdrawn";
 
 void showInviteDialog(BuildContext context, Map<String, dynamic> data) {
   final nav = Navigator.of(context);
@@ -197,6 +297,8 @@ class _InviteDetailsState extends State<_InviteDetails> {
   String? _liveStatus;
   bool _schLoaded = false;
   final Set<String> _open = {};
+  bool _responding = false;
+  String? _error;
 
   List<String> get _titles => (widget.data["scholarshipTitles"] is List)
       ? (widget.data["scholarshipTitles"] as List)
@@ -324,22 +426,23 @@ class _InviteDetailsState extends State<_InviteDetails> {
 
   void _close() => Navigator.pop(widget.dialogContext);
 
+  // "Full details" -> the app's normal scholarship details page
   void _openDetails(String id) {
-    final sponsor = (widget.data["sponsorName"] ?? "").toString();
     _close();
     widget.nav.push(
       MaterialPageRoute(
-        builder: (_) => InviteScholarshipDetailsScreen(
-          scholarshipId: id,
-          sponsorName: sponsor.isEmpty ? null : sponsor,
-        ),
+        builder: (_) => ScholarshipInfoScreen(scholarshipId: id),
       ),
     );
   }
 
-  // Where the student goes to actually apply. Change this one method if the
-  // apply flow lives on a different screen.
-  void _applyTo(String id) => _openDetails(id);
+  // "Apply Now" -> straight into the documents + SOP apply form
+  void _applyTo(String id, Map<String, dynamic> d) {
+    _close();
+    widget.nav.push(
+      MaterialPageRoute(builder: (_) => _applicationForm(id, d)),
+    );
+  }
 
   void _browse() {
     _close();
@@ -370,8 +473,11 @@ class _InviteDetailsState extends State<_InviteDetails> {
     _firstText(_sponsor, ["address", "location", "city", "state"]);
     final about = _firstText(_sponsor, ["about", "description", "bio"]);
 
-    final status = _liveStatus ?? (widget.data["status"] ?? "").toString();
+    final status = _liveStatus ?? (widget.data["status"] ?? "invited").toString();
     final applied = status == "applied";
+    final accepted = status == "accepted" || applied;
+    final declined = status == "declined";
+    final withdrawn = status == "withdrawn";
     final sponsorLoading = _sponsor == null && _sponsorId.isNotEmpty;
     final items = _items;
 
@@ -480,6 +586,30 @@ class _InviteDetailsState extends State<_InviteDetails> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (accepted && !applied)
+                  FadeSlideIn(
+                    child: _statusStrip(
+                      Icons.celebration_rounded,
+                      AppColors.success,
+                      "Invitation accepted! Choose a scholarship below and apply.",
+                    ),
+                  ),
+                if (withdrawn)
+                  FadeSlideIn(
+                    child: _statusStrip(
+                      Icons.undo_rounded,
+                      AppColors.textSecondary,
+                      "The sponsor has withdrawn this invitation.",
+                    ),
+                  ),
+                if (declined)
+                  FadeSlideIn(
+                    child: _statusStrip(
+                      Icons.info_rounded,
+                      AppColors.error,
+                      "You declined this invitation. You can still accept it below.",
+                    ),
+                  ),
                 if (applied)
                   FadeSlideIn(
                     child: Container(
@@ -592,17 +722,21 @@ class _InviteDetailsState extends State<_InviteDetails> {
                   children: [
                     _sectionLabel("SCHOLARSHIPS YOU MATCH (${_titles.length})"),
                     const SizedBox(width: 10),
-                    const _LiveDot(),
+                    if (accepted) const _LiveDot(),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  "Tap a scholarship to see its requirements and apply.",
+                  accepted
+                      ? "Tap a scholarship to see its requirements and apply."
+                      : "Accept the invitation to unlock the requirements and apply.",
                   style: TextStyle(
                       fontSize: 12, color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 10),
-                if (!_schLoaded)
+                if (!accepted)
+                  for (final t in _titles) _lockedTile(t)
+                else if (!_schLoaded)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 18),
                     child: Center(
@@ -631,7 +765,13 @@ class _InviteDetailsState extends State<_InviteDetails> {
               top: BorderSide(color: Colors.black.withOpacity(0.06)),
             ),
           ),
-          child: Row(
+          child: withdrawn
+              ? Row(children: [
+            TextButton(onPressed: _close, child: const Text("Close")),
+          ])
+              : !accepted
+              ? _respondBar(declined)
+              : Row(
             children: [
               TextButton(onPressed: _close, child: const Text("Close")),
               const Spacer(),
@@ -652,6 +792,136 @@ class _InviteDetailsState extends State<_InviteDetails> {
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _statusStrip(IconData icon, Color color, String text) => Container(
+    width: double.infinity,
+    margin: const EdgeInsets.only(bottom: 16),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.12),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: color.withOpacity(0.4)),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(text,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700, fontSize: 13)),
+        ),
+      ],
+    ),
+  );
+
+  Widget _lockedTile(String title) => Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.all(14),
+    decoration: _boxDeco(),
+    child: Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(Icons.lock_rounded, color: AppColors.textSecondary),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(title,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700, fontSize: 14)),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _respond(bool accept) async {
+    if (_responding) return;
+    setState(() {
+      _responding = true;
+      _error = null;
+    });
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? "";
+    final name = _firstText(_student, ["name", "fullName", "userName"]);
+    String? err;
+    try {
+      err = await NotificationService().respondToInvite(
+        sponsorId: _sponsorId,
+        studentId: uid,
+        studentName: name.isEmpty ? "A student" : name,
+        accept: accept,
+        scholarshipTitles: _titles,
+      );
+    } catch (e) {
+      err = e.toString();
+    }
+    if (!mounted) return;
+    setState(() {
+      _responding = false;
+      _error = err;
+    });
+    // Accepted: the live status stream flips the view to "unlocked".
+    if (err == null && !accept) _close();
+  }
+
+  Widget _respondBar(bool declined) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(_error!,
+                style: TextStyle(color: AppColors.error, fontSize: 12.5)),
+          ),
+        Row(
+          children: [
+            if (declined)
+              TextButton(onPressed: _close, child: const Text("Close"))
+            else
+              TextButton(
+                onPressed: _responding ? null : () => _respond(false),
+                child: Text("Decline",
+                    style: TextStyle(color: AppColors.error)),
+              ),
+            const Spacer(),
+            _PulseGlow(
+              active: !_responding,
+              radius: 12,
+              margin: EdgeInsets.zero,
+              child: ElevatedButton.icon(
+                onPressed: _responding ? null : () => _respond(true),
+                icon: _responding
+                    ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                    : const Icon(Icons.check_circle_rounded, size: 18),
+                label: const Text("Accept Invitation",
+                    style: TextStyle(fontWeight: FontWeight.w800)),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(0, 46),
+                  backgroundColor: AppColors.secondary,
+                  foregroundColor: AppColors.primary,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -931,7 +1201,7 @@ class _InviteDetailsState extends State<_InviteDetails> {
                 )
               else if (elig != false && it.id != null)
                 ElevatedButton.icon(
-                  onPressed: () => _applyTo(it.id!),
+                  onPressed: () => _applyTo(it.id!, it.doc ?? {}),
                   icon: const Icon(Icons.send_rounded, size: 17),
                   label: const Text("Apply Now"),
                   style: ElevatedButton.styleFrom(
@@ -1524,7 +1794,7 @@ class InviteScholarshipDetailsScreen extends StatelessWidget {
                       margin: EdgeInsets.zero,
                       child: ElevatedButton.icon(
                         onPressed:
-                        canApply ? () => _confirmApply(context, docs) : null,
+                        canApply ? () => _confirmApply(context, docs, d) : null,
                         icon: Icon(
                             applied
                                 ? Icons.task_alt_rounded
@@ -1602,7 +1872,8 @@ class InviteScholarshipDetailsScreen extends StatelessWidget {
   );
 
   // Pre-apply checklist, then continue into the existing apply flow.
-  void _confirmApply(BuildContext context, List<String> docs) {
+  void _confirmApply(
+      BuildContext context, List<String> docs, Map<String, dynamic> d) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -1635,7 +1906,7 @@ class InviteScholarshipDetailsScreen extends StatelessWidget {
             ),
             onPressed: () {
               Navigator.pop(dialogContext);
-              _startApply(context);
+              _startApply(context, d);
             },
             child: const Text("Continue"),
           ),
@@ -1644,15 +1915,10 @@ class InviteScholarshipDetailsScreen extends StatelessWidget {
     );
   }
 
-  // >>> The ONE place that opens the real apply flow. <<<
-  // Opens the existing apply screen filtered to ONLY this scholarship.
-  void _startApply(BuildContext context) {
+  void _startApply(BuildContext context, Map<String, dynamic> d) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) =>
-            EligibleScholarshipsScreen(scholarshipId: scholarshipId),
-      ),
+      MaterialPageRoute(builder: (_) => _applicationForm(scholarshipId, d)),
     );
   }
 }
@@ -1876,9 +2142,888 @@ class _PulseGlowState extends State<_PulseGlow>
 }
 
 // =========================================================
-// DASHBOARD HIGHLIGHT CARD  (blinking / glowing pending invitation)
+// SPONSOR SIDE: professional, live invitation tracker
+// Opens from sponsor notifications:
+//   Invitation accepted / declined, Invited student applied
+// =========================================================
+
+const List<String> _monthNames = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+];
+
+String _fmtStamp(dynamic v) {
+  if (v is! Timestamp) return "";
+  final d = v.toDate();
+  final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+  final m = d.minute.toString().padLeft(2, "0");
+  return "${d.day} ${_monthNames[d.month - 1]}, $h:$m ${d.hour >= 12 ? 'PM' : 'AM'}";
+}
+
+enum _StepState { done, current, pending, failed }
+
+void showSponsorInviteDialog(BuildContext context, Map<String, dynamic> data) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: "Invitation tracker",
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 380),
+    pageBuilder: (dialogContext, _, __) => SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600, maxHeight: 740),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Material(
+                color: AppColors.background,
+                child: _SponsorInviteView(
+                  data: data,
+                  dialogContext: dialogContext,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+    transitionBuilder: (ctx, anim, _, child) {
+      final curved = CurvedAnimation(
+        parent: anim,
+        curve: Curves.easeOutBack,
+        reverseCurve: Curves.easeIn,
+      );
+      return FadeTransition(
+        opacity: anim,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.08),
+            end: Offset.zero,
+          ).animate(curved),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.92, end: 1).animate(curved),
+            child: child,
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _SponsorInviteView extends StatefulWidget {
+  final Map<String, dynamic> data;
+  final BuildContext dialogContext;
+  const _SponsorInviteView({required this.data, required this.dialogContext});
+
+  @override
+  State<_SponsorInviteView> createState() => _SponsorInviteViewState();
+}
+
+class _SponsorInviteViewState extends State<_SponsorInviteView> {
+  final List<StreamSubscription> _subs = [];
+  Map<String, dynamic>? _invite;
+  Map<String, dynamic>? _student;
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _apps = [];
+
+  bool _busy = false;
+  String? _msg;
+  bool _msgOk = false;
+
+  String get _me => FirebaseAuth.instance.currentUser?.uid ?? "";
+  String get _studentId => (widget.data["studentId"] ?? "").toString();
+
+  @override
+  void initState() {
+    super.initState();
+    _listen();
+  }
+
+  @override
+  void dispose() {
+    for (final s in _subs) {
+      s.cancel();
+    }
+    super.dispose();
+  }
+
+  void _safe(VoidCallback fn) {
+    if (mounted) setState(fn);
+  }
+
+  void _listen() {
+    if (_me.isEmpty || _studentId.isEmpty) return;
+    final db = FirebaseFirestore.instance;
+
+    _subs.add(db
+        .collection("notifications")
+        .doc("invite_${_me}_$_studentId")
+        .snapshots()
+        .listen((s) => _safe(() => _invite = s.data()),
+        onError: (e) => debugPrint("TRACKER invite stream: $e")));
+
+    _subs.add(db.collection("users").doc(_studentId).snapshots().listen(
+            (s) => _safe(() => _student = s.data()),
+        onError: (e) => debugPrint("TRACKER student stream: $e")));
+
+    _subs.add(db
+        .collection("applications")
+        .where("sponsorId", isEqualTo: _me)
+        .where("studentId", isEqualTo: _studentId)
+        .snapshots()
+        .listen((s) => _safe(() => _apps = s.docs),
+        onError: (e) => debugPrint("TRACKER applications stream: $e")));
+  }
+
+  void _close() => Navigator.pop(widget.dialogContext);
+
+  String get _status {
+    final live = _invite?["status"]?.toString();
+    if (live != null && live.isNotEmpty) return live;
+    switch ((widget.data["type"] ?? "").toString()) {
+      case "invite_applied":
+        return "applied";
+      case "invite_accepted":
+        return "accepted";
+      case "invite_declined":
+        return "declined";
+      default:
+        return "invited";
+    }
+  }
+
+  Future<void> _remind() async {
+    setState(() {
+      _busy = true;
+      _msg = null;
+    });
+    final err = await NotificationService()
+        .sendInviteReminder(sponsorId: _me, studentId: _studentId);
+    _safe(() {
+      _busy = false;
+      _msgOk = err == null;
+      _msg = err ?? "Reminder sent to the student ✅";
+    });
+  }
+
+  Future<void> _withdraw() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text("Withdraw invitation?"),
+        content: const Text(
+            "The student will no longer see this invitation and becomes "
+                "available to other sponsors again."),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text("Keep")),
+          TextButton(
+            onPressed: () => Navigator.pop(c, true),
+            child:
+            Text("Withdraw", style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() {
+      _busy = true;
+      _msg = null;
+    });
+    final err = await NotificationService()
+        .withdrawInvite(sponsorId: _me, studentId: _studentId);
+    _safe(() {
+      _busy = false;
+      _msgOk = err == null;
+      _msg = err ?? "Invitation withdrawn.";
+    });
+  }
+
+  // ---------------------------------------------------------
+  @override
+  Widget build(BuildContext context) {
+    final navy = AppColors.primary;
+    final gold = AppColors.secondary;
+    final st = _student;
+    final status = _status;
+
+    final name = _firstText(st, ["name", "fullName", "userName"]).isNotEmpty
+        ? _firstText(st, ["name", "fullName", "userName"])
+        : (widget.data["studentName"] ?? "Student").toString();
+    final college =
+    _firstText(st, ["college", "collegeName", "institution", "institute"]);
+    final course = _firstText(st, ["course", "branch", "department"]);
+
+    Color sColor;
+    String sLabel;
+    IconData sIcon;
+    switch (status) {
+      case "accepted":
+        sColor = AppColors.success;
+        sLabel = "ACCEPTED";
+        sIcon = Icons.check_circle_rounded;
+        break;
+      case "applied":
+        sColor = AppColors.success;
+        sLabel = "APPLIED";
+        sIcon = Icons.task_alt_rounded;
+        break;
+      case "declined":
+        sColor = AppColors.error;
+        sLabel = "DECLINED";
+        sIcon = Icons.cancel_rounded;
+        break;
+      case "withdrawn":
+        sColor = AppColors.textSecondary;
+        sLabel = "WITHDRAWN";
+        sIcon = Icons.undo_rounded;
+        break;
+      default:
+        sColor = gold;
+        sLabel = "AWAITING RESPONSE";
+        sIcon = Icons.hourglass_top_rounded;
+    }
+
+    final canAct = status == "invited" || status == "accepted";
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ---------- header ----------
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(22, 20, 12, 18),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [navy, navy.withOpacity(0.86)],
+            ),
+            border: Border(bottom: BorderSide(color: gold, width: 3)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 700),
+                curve: Curves.elasticOut,
+                builder: (context, v, child) =>
+                    Transform.scale(scale: v, child: child),
+                child: Container(
+                  width: 58,
+                  height: 58,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: gold,
+                    boxShadow: [
+                      BoxShadow(color: gold.withOpacity(0.5), blurRadius: 16),
+                    ],
+                  ),
+                  child: Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : "S",
+                    style: TextStyle(
+                        color: navy,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 400),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(sIcon, size: 14, color: sColor),
+                          const SizedBox(width: 5),
+                          Text(sLabel,
+                              style: TextStyle(
+                                  color: sColor,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.7)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800)),
+                    if (college.isNotEmpty || course.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        [course, college].where((e) => e.isNotEmpty).join("  •  "),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 12.5),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: _close,
+                icon: Icon(Icons.close_rounded,
+                    color: Colors.white.withOpacity(0.8)),
+              ),
+            ],
+          ),
+        ),
+
+        // ---------- body ----------
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FadeSlideIn(
+                  child: Text(
+                    (widget.data["body"] ?? "").toString(),
+                    style: TextStyle(
+                        fontSize: 13.5,
+                        height: 1.45,
+                        color: AppColors.textPrimary),
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // tracker
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 90),
+                  child: _panel("INVITATION TRACKER", _timeline(status)),
+                ),
+
+                // applications from this student
+                if (_apps.isNotEmpty)
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 180),
+                    child: _panel(
+                      "APPLICATIONS (${_apps.length})",
+                      Column(children: [for (final a in _apps) _appTile(a)]),
+                    ),
+                  ),
+
+                // student snapshot
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 270),
+                  child: _panel(
+                    "STUDENT SNAPSHOT",
+                    _snapshot(st, status == "accepted" || status == "applied"),
+                  ),
+                ),
+
+                // matched scholarships
+                if (_matched.isNotEmpty)
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 360),
+                    child: _panel(
+                      "MATCHED SCHOLARSHIPS (${_matched.length})",
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final t in _matched)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 11, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.07),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _appliedTitles.contains(t)
+                                        ? Icons.check_circle_rounded
+                                        : Icons.school_rounded,
+                                    size: 14,
+                                    color: _appliedTitles.contains(t)
+                                        ? AppColors.success
+                                        : AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(t,
+                                      style: const TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 4),
+              ],
+            ),
+          ),
+        ),
+
+        // ---------- footer ----------
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            border: Border(
+                top: BorderSide(color: Colors.black.withOpacity(0.06))),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AnimatedSize(
+                duration: const Duration(milliseconds: 250),
+                child: _msg == null
+                    ? const SizedBox(width: double.infinity, height: 0)
+                    : Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    _msg!,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: _msgOk ? AppColors.success : AppColors.error,
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  TextButton(onPressed: _close, child: const Text("Close")),
+                  const Spacer(),
+                  if (canAct) ...[
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _withdraw,
+                      icon: const Icon(Icons.undo_rounded, size: 17),
+                      label: const Text("Withdraw"),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                        foregroundColor: AppColors.error,
+                        side: BorderSide(
+                            color: AppColors.error.withOpacity(0.5)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton.icon(
+                      onPressed: _busy ? null : _remind,
+                      icon: _busy
+                          ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                          : const Icon(Icons.notifications_active_rounded,
+                          size: 17),
+                      label: const Text("Send Reminder",
+                          style: TextStyle(fontWeight: FontWeight.w800)),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                        backgroundColor: gold,
+                        foregroundColor: navy,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<String> get _matched => (_invite?["scholarshipTitles"] is List)
+      ? (_invite!["scholarshipTitles"] as List).map((e) => e.toString()).toList()
+      : <String>[];
+
+  Set<String> get _appliedTitles {
+    final out = <String>{};
+    if (_invite?["appliedTitles"] is List) {
+      out.addAll((_invite!["appliedTitles"] as List).map((e) => e.toString()));
+    }
+    for (final a in _apps) {
+      final t = (a.data()["scholarshipTitle"] ?? "").toString();
+      if (t.isNotEmpty) out.add(t);
+    }
+    return out;
+  }
+
+  Widget _panel(String title, Widget child) => Container(
+    width: double.infinity,
+    margin: const EdgeInsets.only(bottom: 14),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: Colors.black.withOpacity(0.05)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.04),
+          blurRadius: 10,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle(title),
+        const SizedBox(height: 12),
+        child,
+      ],
+    ),
+  );
+
+  // ---------- animated Invited -> Accepted -> Applied ----------
+  Widget _timeline(String status) {
+    final declined = status == "declined";
+    final withdrawn = status == "withdrawn";
+    final applied = status == "applied";
+    final accepted = status == "accepted" || applied;
+
+    final secondLabel =
+    declined ? "Declined" : (withdrawn ? "Withdrawn" : "Accepted");
+    final secondState = (declined || withdrawn)
+        ? _StepState.failed
+        : (accepted ? _StepState.done : _StepState.current);
+    final thirdState = applied
+        ? _StepState.done
+        : (accepted ? _StepState.current : _StepState.pending);
+
+    Widget connector(bool filled) => Expanded(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 17),
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: filled ? 1 : 0),
+          duration: const Duration(milliseconds: 900),
+          curve: Curves.easeInOut,
+          builder: (context, v, _) => Container(
+            height: 3,
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(3),
+            ),
+            alignment: Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: v,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.success,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _stepNode(0, "Invited", _fmtStamp(_invite?["createdAt"]),
+            _StepState.done, Icons.send_rounded),
+        connector(accepted || declined),
+        _stepNode(
+            1,
+            secondLabel,
+            _fmtStamp(_invite?["respondedAt"]),
+            secondState,
+            declined
+                ? Icons.close_rounded
+                : (withdrawn ? Icons.undo_rounded : Icons.thumb_up_alt_rounded)),
+        connector(applied),
+        _stepNode(2, "Applied", _fmtStamp(_invite?["appliedAt"]), thirdState,
+            Icons.description_rounded),
+      ],
+    );
+  }
+
+  Widget _stepNode(
+      int index, String label, String time, _StepState state, IconData icon) {
+    Color bg;
+    Widget inner;
+    switch (state) {
+      case _StepState.done:
+        bg = AppColors.success;
+        inner = const Icon(Icons.check_rounded, color: Colors.white, size: 20);
+        break;
+      case _StepState.failed:
+        bg = AppColors.error;
+        inner = Icon(icon, color: Colors.white, size: 19);
+        break;
+      case _StepState.current:
+        bg = AppColors.secondary;
+        inner = Icon(icon, color: AppColors.primary, size: 18);
+        break;
+      default:
+        bg = Colors.black.withOpacity(0.10);
+        inner = Icon(icon, color: AppColors.textSecondary, size: 17);
+    }
+
+    Widget node = Container(
+      width: 36,
+      height: 36,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+      child: inner,
+    );
+    if (state == _StepState.current) {
+      node = _PulseGlow(
+        active: true,
+        radius: 18,
+        margin: EdgeInsets.zero,
+        child: node,
+      );
+    }
+
+    return SizedBox(
+      width: 86,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.0, end: 1.0),
+        duration: Duration(milliseconds: 500 + index * 250),
+        curve: Curves.elasticOut,
+        builder: (context, v, child) => Transform.scale(
+          scale: v.clamp(0.0, 1.2),
+          child: child,
+        ),
+        child: Column(
+          children: [
+            node,
+            const SizedBox(height: 8),
+            Text(label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: state == _StepState.pending
+                      ? AppColors.textSecondary
+                      : AppColors.textPrimary,
+                )),
+            if (time.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(time,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 10.5, color: AppColors.textSecondary)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------- student snapshot ----------
+  Widget _snapshot(Map<String, dynamic>? st, bool revealContact) {
+    if (st == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+        ),
+      );
+    }
+
+    final pctText = _firstText(st, ["percentage", "cgpa", "marks"]);
+    final pct = double.tryParse(pctText.replaceAll("%", "").trim());
+    final year = _firstText(st, ["year", "yearOfStudy"]);
+    final cat = _firstText(st, ["category", "community"]);
+    final city = _firstText(st, ["city", "district"]);
+    final state = _firstText(st, ["state"]);
+    final location = [city, state].where((e) => e.isNotEmpty).join(", ");
+    final income =
+    _firstText(st, ["annualIncome", "familyIncome", "income"]);
+    final email = _firstText(st, ["email"]);
+    final phone = _firstText(st, ["phone", "phoneNumber", "mobile"]);
+
+    Widget stat(IconData icon, String label, Widget value) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 20, color: AppColors.secondary),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              value,
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 11, color: AppColors.textSecondary)),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    const valStyle = TextStyle(fontSize: 16, fontWeight: FontWeight.w900);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            if (pct != null)
+              stat(
+                Icons.grade_rounded,
+                "Academic score",
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: pct),
+                  duration: const Duration(milliseconds: 1100),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, v, _) => Text(
+                    "${v.toStringAsFixed(1)}${pctText.contains('%') || pct > 10 ? '%' : ''}",
+                    style: valStyle,
+                  ),
+                ),
+              ),
+            if (year.isNotEmpty)
+              stat(Icons.timeline_rounded, "Year", Text(year, style: valStyle)),
+            if (cat.isNotEmpty)
+              stat(Icons.groups_rounded, "Category",
+                  Text(cat, style: valStyle)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        _InfoRow(
+            icon: Icons.location_on_rounded,
+            label: "Location",
+            value: location),
+        _InfoRow(
+            icon: Icons.account_balance_wallet_rounded,
+            label: "Family income",
+            value: income.isEmpty || income.startsWith("₹") ? income : "₹$income"),
+        if (revealContact) ...[
+          _InfoRow(icon: Icons.email_rounded, label: "Email", value: email),
+          _InfoRow(icon: Icons.phone_rounded, label: "Phone", value: phone),
+        ] else
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                Icon(Icons.lock_rounded,
+                    size: 16, color: AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "Contact details are shown once the student accepts.",
+                    style: TextStyle(
+                        fontSize: 12.5, color: AppColors.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _appTile(QueryDocumentSnapshot<Map<String, dynamic>> a) {
+    final m = a.data();
+    final title = (m["scholarshipTitle"] ?? "Scholarship").toString();
+    final status = (m["status"] ?? "Pending").toString();
+    final verified = m["documentsVerified"] == true;
+
+    Color c;
+    switch (status.toLowerCase()) {
+      case "approved":
+        c = AppColors.success;
+        break;
+      case "rejected":
+        c = AppColors.error;
+        break;
+      default:
+        c = AppColors.secondary;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.description_rounded, color: AppColors.primary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 13.5)),
+                const SizedBox(height: 2),
+                Text(
+                  verified ? "Documents verified" : "Documents not verified yet",
+                  style: TextStyle(
+                      fontSize: 11.5,
+                      color: verified
+                          ? AppColors.success
+                          : AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: c.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(status,
+                style: TextStyle(
+                    color: c, fontSize: 11.5, fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =========================================================
+// DASHBOARD INVITATION CARDS  (every pending invitation, glowing)
 // Add to the student dashboard:  const InviteHighlightCard()
-// Disappears automatically once the student applies.
+// A card disappears once the student applies or declines.
 // =========================================================
 
 class InviteHighlightCard extends StatefulWidget {
@@ -1912,8 +3057,7 @@ class _InviteHighlightCardState extends State<InviteHighlightCard>
         final invites = (snap.data?.docs ?? []).where((d) {
           final m = d.data();
           return (m["audience"] ?? "student") == "student" &&
-              m["type"] == "invite" &&
-              m["status"] != "applied";
+              _isPendingInvite(m);
         }).toList();
 
         if (invites.isEmpty) return const SizedBox.shrink();
@@ -1924,165 +3068,202 @@ class _InviteHighlightCardState extends State<InviteHighlightCard>
         }
 
         invites.sort((a, b) => ts(b).compareTo(ts(a)));
-        final first = invites.first;
-        final data = first.data();
-        final anyUnread = invites.any((d) => d.data()["isRead"] != true);
-
-        final sponsor = (data["sponsorName"] ?? "A sponsor").toString();
-        final n = (data["scholarshipTitles"] is List)
-            ? (data["scholarshipTitles"] as List).length
-            : 0;
-        final more = invites.length - 1;
-
-        final gold = AppColors.secondary;
-        final navy = AppColors.primary;
+        final shown = invites.take(3).toList();
+        final extra = invites.length - shown.length;
 
         return AnimatedBuilder(
           animation: _c,
           builder: (context, _) {
             final t = Curves.easeInOut.transform(_c.value);
-            return Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () async {
-                  try {
-                    if (data["isRead"] != true) {
-                      await NotificationService().markRead(first.id);
-                    }
-                  } catch (_) {}
-                  if (context.mounted) showInviteDialog(context, data);
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [navy, navy.withOpacity(0.88)],
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < shown.length; i++)
+                  FadeSlideIn(
+                    key: ValueKey("inv_${shown[i].id}"),
+                    delay: Duration(milliseconds: 120 * i),
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _tile(context, shown[i], t),
                     ),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: gold.withOpacity(0.6 + 0.4 * t), width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: gold.withOpacity(0.25 + 0.35 * t),
-                        blurRadius: 14 + 16 * t,
-                        spreadRadius: 1 + 2 * t,
-                      ),
-                    ],
                   ),
-                  child: Row(
-                    children: [
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration:
-                            BoxDecoration(shape: BoxShape.circle, color: gold),
-                            child: Icon(Icons.mail_rounded,
-                                color: navy, size: 26),
-                          ),
-                          if (anyUnread)
-                            Positioned(
-                              right: -2,
-                              top: -2,
-                              child: Opacity(
-                                opacity: 0.35 + 0.65 * t,
-                                child: Container(
-                                  width: 14,
-                                  height: 14,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.error,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: Colors.white, width: 2),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
+                if (extra > 0)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const NotificationScreen()),
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Opacity(
-                              opacity: 0.55 + 0.45 * t,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: gold.withOpacity(0.22),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  anyUnread
-                                      ? "NEW INVITATION"
-                                      : "PENDING INVITATION",
-                                  style: TextStyle(
-                                    color: gold,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.8,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              "$sponsor invited you to apply!",
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              "$n matching scholarship${n == 1 ? '' : 's'}"
-                                  "${more > 0 ? '  •  +$more more invitation${more == 1 ? '' : 's'}' : ''}"
-                                  "  •  Tap to view details",
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.82),
-                                fontSize: 12.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 9),
-                        decoration: BoxDecoration(
-                          color: gold,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          "View",
-                          style: TextStyle(
-                            color: navy,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
+                      icon: const Icon(Icons.notifications_active_rounded,
+                          size: 18),
+                      label: Text("View all ${invites.length} invitations"),
+                    ),
                   ),
-                ),
-              ),
+              ],
             );
           },
         );
       },
+    );
+  }
+
+  Widget _tile(BuildContext context,
+      QueryDocumentSnapshot<Map<String, dynamic>> doc, double t) {
+    final data = doc.data();
+    final accepted = _inviteStatus(data) == "accepted";
+    final unread = data["isRead"] != true;
+    final sponsor = (data["sponsorName"] ?? "A sponsor").toString();
+    final n = (data["scholarshipTitles"] is List)
+        ? (data["scholarshipTitles"] as List).length
+        : 0;
+    final gold = AppColors.secondary;
+    final navy = AppColors.primary;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () async {
+          try {
+            if (unread) await NotificationService().markRead(doc.id);
+          } catch (_) {}
+          if (context.mounted) showInviteDialog(context, data);
+        },
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [navy, navy.withOpacity(0.88)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border:
+            Border.all(color: gold.withOpacity(0.6 + 0.4 * t), width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: gold.withOpacity(0.25 + 0.35 * t),
+                blurRadius: 14 + 16 * t,
+                spreadRadius: 1 + 2 * t,
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration:
+                    BoxDecoration(shape: BoxShape.circle, color: gold),
+                    child: Icon(
+                      accepted ? Icons.check_rounded : Icons.mail_rounded,
+                      color: navy,
+                      size: 26,
+                    ),
+                  ),
+                  if (unread)
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Opacity(
+                        opacity: 0.35 + 0.65 * t,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: AppColors.error,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Opacity(
+                      opacity: 0.55 + 0.45 * t,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: gold.withOpacity(0.22),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          accepted
+                              ? "ACCEPTED · APPLY NOW"
+                              : (unread
+                              ? "NEW INVITATION"
+                              : "PENDING INVITATION"),
+                          style: TextStyle(
+                            color: gold,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      accepted
+                          ? "You accepted $sponsor's invitation"
+                          : "$sponsor invited you to apply!",
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      accepted
+                          ? "Choose a scholarship and apply"
+                          : "$n matching scholarship${n == 1 ? '' : 's'}"
+                          "  •  Tap to view & accept",
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.82),
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                decoration: BoxDecoration(
+                  color: gold,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  accepted ? "Apply" : "View",
+                  style: TextStyle(
+                    color: navy,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -2699,6 +3880,12 @@ class _NotificationCard extends StatelessWidget {
         return (icon: Icons.mail_rounded, color: AppColors.secondary);
       case "invite_accepted":
         return (icon: Icons.how_to_reg_rounded, color: AppColors.success);
+      case "invite_applied":
+        return (icon: Icons.task_alt_rounded, color: AppColors.success);
+      case "invite_declined":
+        return (icon: Icons.person_off_rounded, color: AppColors.error);
+      case "invite_reminder":
+        return (icon: Icons.alarm_rounded, color: AppColors.secondary);
       case "applied":
       case "application_received":
         return (icon: Icons.description_rounded, color: AppColors.primary);
@@ -2740,6 +3927,28 @@ class _NotificationCard extends StatelessWidget {
     final type = (data["type"] ?? "info").toString();
     final audience = (data["audience"] ?? "student").toString();
 
+    if (audience == "sponsor" && type.startsWith("invite_")) {
+      showSponsorInviteDialog(context, data);
+      return;
+    }
+
+    if (type == "invite_reminder") {
+      final uid = FirebaseAuth.instance.currentUser?.uid ?? "";
+      final sid = (data["sponsorId"] ?? "").toString();
+      try {
+        final snap = await FirebaseFirestore.instance
+            .collection("notifications")
+            .doc(service.inviteDocId(sid, uid))
+            .get();
+        if (snap.exists && context.mounted) {
+          showInviteDialog(context, snap.data()!);
+          return;
+        }
+      } catch (e) {
+        debugPrint("REMINDER open error: $e");
+      }
+    }
+
     if (audience == "sponsor") {
       // sponsor-side notifications: just show the details
       showDialog(
@@ -2771,8 +3980,8 @@ class _NotificationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = _style;
     final unread = data["isRead"] != true;
-    final pendingInvite = (data["type"] ?? "") == "invite" &&
-        (data["status"] ?? "") != "applied";
+    final pendingInvite = _isPendingInvite(data);
+    final inviteAccepted = _inviteStatus(data) == "accepted";
 
     return Dismissible(
       key: ValueKey(id),
@@ -2789,8 +3998,10 @@ class _NotificationCard extends StatelessWidget {
       ),
       onDismissed: (_) => service.delete(id),
       child: _PulseGlow(
-        active: (data["type"] ?? "") == "invite" &&
-            (data["status"] ?? "") != "applied",
+        active: _isPendingInvite(data) ||
+            (unread &&
+                ((data["type"] ?? "") == "invite_accepted" ||
+                    (data["type"] ?? "") == "invite_applied")),
         child: Container(
           decoration: BoxDecoration(
             color: pendingInvite ? null : AppColors.card,
@@ -2841,7 +4052,7 @@ class _NotificationCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (pendingInvite) ...[
-                          const _BlinkChip("NEW INVITATION"),
+                          _BlinkChip(inviteAccepted ? "ACCEPTED · APPLY NOW" : "NEW INVITATION"),
                           const SizedBox(height: 8),
                         ],
                         Row(
@@ -2878,7 +4089,9 @@ class _NotificationCard extends StatelessWidget {
                         if (pendingInvite) ...[
                           const SizedBox(height: 8),
                           Text(
-                            "View sponsor details & apply  →",
+                            inviteAccepted
+                                ? "Choose a scholarship & apply  →"
+                                : "View sponsor details & accept  →",
                             style: TextStyle(
                               color: AppColors.primary,
                               fontWeight: FontWeight.w800,

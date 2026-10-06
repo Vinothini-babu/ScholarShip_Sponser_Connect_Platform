@@ -43,6 +43,7 @@ class StudentSuggestionSection extends StatelessWidget {
       List<QueryDocumentSnapshot<Map<String, dynamic>>> scholarships,
       Set<String> appliedStudentIds,
       List<QueryDocumentSnapshot<Map<String, dynamic>>> students,
+      Set<String> invitedByOthers,
       ) {
     final result = <SuggestedStudent>[];
 
@@ -57,6 +58,11 @@ class StudentSuggestionSection extends StatelessWidget {
 
       if (st["isAwarded"] == true) {
         debugPrint("SUGGEST: skip $name -> already awarded");
+        continue;
+      }
+      // privacy: a student invited by ANOTHER sponsor is reserved for them
+      if (invitedByOthers.contains(s.id)) {
+        debugPrint("SUGGEST: skip $name -> invited by another sponsor");
         continue;
       }
       if (appliedStudentIds.contains(s.id)) {
@@ -100,33 +106,40 @@ class StudentSuggestionSection extends StatelessWidget {
             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: db.collection("users").snapshots(),
               builder: (context, stuSnap) {
-                final scholarships = schSnap.data?.docs ?? [];
-                final applied = (appSnap.data?.docs ?? [])
-                    .map((d) => (d.data()["studentId"] ?? "").toString())
-                    .toSet();
-                final students = stuSnap.data?.docs ?? [];
+                return StreamBuilder<Set<String>>(
+                  stream: NotificationService()
+                      .studentIdsInvitedByOthers(sponsorId),
+                  builder: (context, invSnap) {
+                    final invitedByOthers = invSnap.data ?? <String>{};
+                    final scholarships = schSnap.data?.docs ?? [];
+                    final applied = (appSnap.data?.docs ?? [])
+                        .map((d) => (d.data()["studentId"] ?? "").toString())
+                        .toSet();
+                    final students = stuSnap.data?.docs ?? [];
 
-                final suggestions = (scholarships.isEmpty || students.isEmpty)
-                    ? <SuggestedStudent>[]
-                    : _compute(scholarships, applied, students);
+                    final suggestions = (scholarships.isEmpty || students.isEmpty)
+                        ? <SuggestedStudent>[]
+                        : _compute(scholarships, applied, students, invitedByOthers);
 
-                final previewInitials = suggestions.take(3).map((x) {
-                  final n = (x.data["name"] ?? x.data["fullName"] ?? "S").toString().trim();
-                  return n.isEmpty ? "S" : n[0].toUpperCase();
-                }).toList();
+                    final previewInitials = suggestions.take(3).map((x) {
+                      final n = (x.data["name"] ?? x.data["fullName"] ?? "S").toString().trim();
+                      return n.isEmpty ? "S" : n[0].toUpperCase();
+                    }).toList();
 
-                return BlinkingSuggestionCard(
-                  count: suggestions.length,
-                  previewInitials: previewInitials,
-                  hasScholarships: scholarships.isNotEmpty,
-                  onTap: suggestions.isEmpty
-                      ? null
-                      : () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SuggestedStudentsScreen(students: suggestions),
-                    ),
-                  ),
+                    return BlinkingSuggestionCard(
+                      count: suggestions.length,
+                      previewInitials: previewInitials,
+                      hasScholarships: scholarships.isNotEmpty,
+                      onTap: suggestions.isEmpty
+                          ? null
+                          : () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SuggestedStudentsScreen(students: suggestions),
+                        ),
+                      ),
+                    );
+                  },
                 );
               },
             );
@@ -610,8 +623,30 @@ class _SuggestedStudentsScreenState extends State<SuggestedStudentsScreen> {
   String _query = "";
   String _category = "All";
 
+  // students another sponsor has invited -> hidden here (live)
+  Set<String> _hidden = {};
+  StreamSubscription<Set<String>>? _hiddenSub;
+
+  @override
+  void initState() {
+    super.initState();
+    final me = FirebaseAuth.instance.currentUser?.uid;
+    if (me != null) {
+      _hiddenSub = NotificationService().studentIdsInvitedByOthers(me).listen(
+            (ids) {
+          if (mounted) setState(() => _hidden = ids);
+        },
+        onError: (e) => debugPrint("SUGGEST hidden stream: $e"),
+      );
+    }
+  }
+
+  List<SuggestedStudent> get _visible =>
+      widget.students.where((s) => !_hidden.contains(s.uid)).toList();
+
   @override
   void dispose() {
+    _hiddenSub?.cancel();
     _searchC.dispose();
     super.dispose();
   }
@@ -621,7 +656,7 @@ class _SuggestedStudentsScreenState extends State<SuggestedStudentsScreen> {
 
   List<String> get _categories {
     final set = <String>{};
-    for (final st in widget.students) {
+    for (final st in _visible) {
       final c = _s(st, "category");
       if (c.isNotEmpty) set.add(c);
     }
@@ -631,7 +666,7 @@ class _SuggestedStudentsScreenState extends State<SuggestedStudentsScreen> {
 
   List<SuggestedStudent> get _filtered {
     final q = _query.trim().toLowerCase();
-    return widget.students.where((st) {
+    return _visible.where((st) {
       if (_category != "All" && _s(st, "category") != _category) return false;
       if (q.isEmpty) return true;
       final hay = [
@@ -646,7 +681,7 @@ class _SuggestedStudentsScreenState extends State<SuggestedStudentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final all = widget.students;
+    final all = _visible;
     final list = _filtered;
 
     final totalMatches =

@@ -122,8 +122,30 @@ class NotificationService {
   }) async {
     final ref = _col.doc(inviteDocId(sponsorId, studentId));
 
+    // A student invited by one sponsor is reserved: no other sponsor can
+    // invite them (a declined invitation frees the student again).
+    try {
+      final others = await _col
+          .where("userId", isEqualTo: studentId)
+          .where("type", isEqualTo: "invite")
+          .get();
+      for (final d in others.docs) {
+        final m = d.data();
+        if ((m["sponsorId"] ?? "") != sponsorId &&
+            (m["status"] ?? "invited") != "declined" &&
+            (m["status"] ?? "invited") != "withdrawn") {
+          return "This student has already been invited by another sponsor.";
+        }
+      }
+    } catch (e) {
+      debugPrint("INVITE reserve check error: $e");
+    }
+
     final existing = await ref.get();
-    if (existing.exists) return "You have already invited this student.";
+    // a withdrawn invitation may be sent again
+    if (existing.exists && existing.data()?["status"] != "withdrawn") {
+      return "You have already invited this student.";
+    }
 
     await ref.set({
       "userId": studentId,
@@ -143,6 +165,148 @@ class NotificationService {
       "createdAt": FieldValue.serverTimestamp(),
     });
     return null;
+  }
+
+  // ---------------- Privacy: hide invited students from other sponsors ----------------
+
+  /// Student ids currently reserved by an invitation from a DIFFERENT sponsor
+  /// (pending / accepted / applied). Use it to hide those students from this
+  /// sponsor's "Suggested Students". A declined invitation frees the student.
+  Stream<Set<String>> studentIdsInvitedByOthers(String mySponsorId) {
+    return _col.where("type", isEqualTo: "invite").snapshots().map((s) {
+      final out = <String>{};
+      for (final d in s.docs) {
+        final m = d.data();
+        if ((m["sponsorId"] ?? "") == mySponsorId) continue;
+        if ((m["status"] ?? "invited") == "declined") continue;
+        if ((m["status"] ?? "invited") == "withdrawn") continue;
+        final id = (m["userId"] ?? "").toString();
+        if (id.isNotEmpty) out.add(id);
+      }
+      return out;
+    });
+  }
+
+  // ---------------- Sponsor tools: reminder / withdraw ----------------
+
+  /// Nudges the student about a pending / accepted invitation (max once per 24h).
+  /// Returns null on success, or a message.
+  Future<String?> sendInviteReminder({
+    required String sponsorId,
+    required String studentId,
+  }) async {
+    try {
+      final ref = _col.doc(inviteDocId(sponsorId, studentId));
+      final snap = await ref.get();
+      final m = snap.data();
+      if (m == null) return "Invitation not found.";
+
+      final st = (m["status"] ?? "invited").toString();
+      if (st == "applied") return "The student has already applied.";
+      if (st == "declined" || st == "withdrawn") {
+        return "This invitation is closed.";
+      }
+
+      final last = m["lastReminderAt"];
+      if (last is Timestamp &&
+          DateTime.now().difference(last.toDate()).inHours < 24) {
+        return "You already sent a reminder in the last 24 hours.";
+      }
+
+      final sponsorName = (m["sponsorName"] ?? "A sponsor").toString();
+      await ref.update({"lastReminderAt": FieldValue.serverTimestamp()});
+      await send(
+        userId: studentId,
+        audience: "student",
+        type: "invite_reminder",
+        title: "Reminder from $sponsorName ⏰",
+        body: st == "accepted"
+            ? "$sponsorName is waiting for your application. Pick a "
+            "scholarship and apply before the last date."
+            : "$sponsorName invited you to apply. Open the invitation to "
+            "accept it.",
+        extra: {"sponsorId": sponsorId, "sponsorName": sponsorName},
+      );
+      return null;
+    } catch (e) {
+      debugPrint("NOTIFY sendInviteReminder ERROR: $e");
+      return "Could not send the reminder. Please try again.";
+    }
+  }
+
+  /// Sponsor cancels an invitation that has not been applied to yet.
+  /// The student disappears from the "pending" list and is free for other
+  /// sponsors again. Returns null on success, or a message.
+  Future<String?> withdrawInvite({
+    required String sponsorId,
+    required String studentId,
+  }) async {
+    try {
+      final ref = _col.doc(inviteDocId(sponsorId, studentId));
+      final snap = await ref.get();
+      final st = (snap.data()?["status"] ?? "invited").toString();
+      if (!snap.exists) return "Invitation not found.";
+      if (st == "applied") {
+        return "The student has already applied, so it cannot be withdrawn.";
+      }
+      await ref.update({
+        "status": "withdrawn",
+        "withdrawnAt": FieldValue.serverTimestamp(),
+      });
+      return null;
+    } catch (e) {
+      debugPrint("NOTIFY withdrawInvite ERROR: $e");
+      return "Could not withdraw the invitation. Please try again.";
+    }
+  }
+
+  // ---------------- Student accepts / declines an invitation ----------------
+
+  /// Returns null on success, or an error message.
+  /// Marks the invite accepted/declined and notifies the sponsor.
+  Future<String?> respondToInvite({
+    required String sponsorId,
+    required String studentId,
+    required String studentName,
+    required bool accept,
+    List<String> scholarshipTitles = const [],
+  }) async {
+    try {
+      if (sponsorId.isEmpty || studentId.isEmpty) {
+        return "Invitation details are missing.";
+      }
+      final ref = _col.doc(inviteDocId(sponsorId, studentId));
+      final snap = await ref.get();
+      if (!snap.exists) return "This invitation is no longer available.";
+      if (snap.data()?["status"] == "applied") return null;
+      if (snap.data()?["status"] == "withdrawn") {
+        return "This invitation was withdrawn by the sponsor.";
+      }
+
+      await ref.update({
+        "status": accept ? "accepted" : "declined",
+        "respondedAt": FieldValue.serverTimestamp(),
+        "isRead": true,
+      });
+
+      final c = scholarshipTitles.length;
+      await send(
+        userId: sponsorId,
+        audience: "sponsor",
+        type: accept ? "invite_accepted" : "invite_declined",
+        title: accept ? "Invitation accepted ✅" : "Invitation declined",
+        body: accept
+            ? "$studentName accepted your invitation and is reviewing "
+            "${c == 0 ? 'your scholarships' : '$c scholarship${c == 1 ? '' : 's'}'}. "
+            "An application may follow soon."
+            : "$studentName declined your invitation.",
+        extra: {"studentId": studentId, "studentName": studentName},
+      );
+      return null;
+    } catch (e) {
+      debugPrint("NOTIFY respondToInvite ERROR: $e");
+      return "Could not update the invitation. Please try again.";
+    }
   }
 
   // ---------------- Invited student applied (student -> sponsor) ----------------
@@ -174,7 +338,7 @@ class NotificationService {
       await send(
         userId: sponsorId,
         audience: "sponsor",
-        type: "invite_accepted",
+        type: "invite_applied",
         title: "Invited student applied 🎉",
         body: "$studentName accepted your invitation and applied for "
             "$scholarshipTitle. Review the application now.",
