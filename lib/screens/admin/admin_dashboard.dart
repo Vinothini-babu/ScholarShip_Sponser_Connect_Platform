@@ -14,6 +14,8 @@ import 'manage_scholarships_screen.dart';
 import 'view_applications_screen.dart';
 import 'reports_screen.dart';
 import 'contact_directory_screen.dart';
+import 'admin_feedback_screen.dart';
+import '../../services/feedback_service.dart';
 
 // ================================================================
 // HELPERS
@@ -659,6 +661,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             icon: Icons.business_rounded,
           ),
         ),
+      ),
+      StreamBuilder<int>(
+        stream: FeedbackService().newCount(),
+        builder: (context, snap) {
+          final n = snap.data ?? 0;
+          return _QuickActionCard(
+            icon: Icons.reviews_rounded,
+            title: "Feedback",
+            subtitle: n > 0 ? "$n new to review" : "Ratings & comments",
+            color: Colors.amber.shade800,
+            highlighted: n > 0,
+            onTap: () => _go(const AdminFeedbackScreen()),
+          );
+        },
       ),
     ];
 

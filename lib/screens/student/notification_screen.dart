@@ -11,6 +11,7 @@ import '../../services/notification_service.dart';
 import 'all_scholarships_screen.dart';
 import 'my_applications_screen.dart';
 import 'scholarship_applications_screen.dart';
+import '../common/feedback_screen.dart';
 import 'scholarship_info_screen.dart';
 import '../../utils/eligibility_utils.dart';
 
@@ -197,6 +198,122 @@ Widget _applicationForm(String id, Map<String, dynamic> d) {
     lastDate: _padDate(d["lastDate"]),
     eligibility: _val(d["eligibility"]),
     requiredDocuments: docs,
+  );
+}
+
+void showFeedbackReplyDialog(BuildContext context, Map<String, dynamic> data) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: "Reply",
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 340),
+    pageBuilder: (dialogContext, _, __) => SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: Material(
+                color: AppColors.background,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        border: Border(
+                            bottom: BorderSide(
+                                color: AppColors.secondary, width: 3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.forum_rounded,
+                              color: AppColors.secondary, size: 28),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Text("Admin replied to your feedback",
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border(
+                              left: BorderSide(
+                                  color: AppColors.secondary, width: 3)),
+                        ),
+                        child: SelectableText(
+                          (data["body"] ?? "").toString(),
+                          style: const TextStyle(fontSize: 14, height: 1.5),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                      child: Row(
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(dialogContext),
+                            child: const Text("Close"),
+                          ),
+                          const Spacer(),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(dialogContext);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const FeedbackScreen()),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(0, 44),
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text("View my feedback"),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+    transitionBuilder: (ctx, anim, _, child) {
+      final curved = CurvedAnimation(
+          parent: anim, curve: Curves.easeOutBack, reverseCurve: Curves.easeIn);
+      return FadeTransition(
+        opacity: anim,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.92, end: 1).animate(curved),
+          child: child,
+        ),
+      );
+    },
   );
 }
 
@@ -3886,6 +4003,8 @@ class _NotificationCard extends StatelessWidget {
         return (icon: Icons.person_off_rounded, color: AppColors.error);
       case "invite_reminder":
         return (icon: Icons.alarm_rounded, color: AppColors.secondary);
+      case "feedback_reply":
+        return (icon: Icons.forum_rounded, color: AppColors.secondary);
       case "applied":
       case "application_received":
         return (icon: Icons.description_rounded, color: AppColors.primary);
@@ -3926,6 +4045,11 @@ class _NotificationCard extends StatelessWidget {
 
     final type = (data["type"] ?? "info").toString();
     final audience = (data["audience"] ?? "student").toString();
+
+    if (type == "feedback_reply") {
+      showFeedbackReplyDialog(context, data);
+      return;
+    }
 
     if (audience == "sponsor" && type.startsWith("invite_")) {
       showSponsorInviteDialog(context, data);

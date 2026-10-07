@@ -21,6 +21,7 @@ import '../../utils/eligibility_utils.dart';
 import 'all_scholarships_screen.dart';
 import 'support_screen.dart';
 import 'notification_screen.dart';
+import '../common/feedback_screen.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -198,6 +199,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   ),
                 ),
 
+                // "How was your experience?" after an approved / rejected application
+                const FeedbackPromptCard(),
+
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: const FadeSlideIn(
@@ -296,7 +300,6 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         final isWide = constraints.maxWidth >= 500;
-                        final crossAxisCount = isWide ? 4 : 2;
 
                         final actions = [
                           _QuickAction(
@@ -339,14 +342,48 @@ class _StudentDashboardState extends State<StudentDashboard> {
                               );
                             },
                           ),
+                          _QuickAction(
+                            icon: Icons.rate_review_rounded,
+                            title: "Feedback",
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const FeedbackScreen()),
+                              );
+                            },
+                          ),
                         ];
 
+                        // Wide screens: 3 cards on top, 2 below (fills full width)
+                        if (isWide) {
+                          Widget rowOf(List<Widget> items) => SizedBox(
+                            height: 68,
+                            child: Row(
+                              children: [
+                                for (int i = 0; i < items.length; i++) ...[
+                                  if (i > 0) const SizedBox(width: 12),
+                                  Expanded(child: items[i]),
+                                ],
+                              ],
+                            ),
+                          );
+
+                          return Column(
+                            children: [
+                              rowOf(actions.sublist(0, 3)),
+                              const SizedBox(height: 12),
+                              rowOf(actions.sublist(3)),
+                            ],
+                          );
+                        }
+
+                        // Narrow screens (mobile): 2 per row
                         return GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: actions.length,
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
                             mainAxisExtent: 68,

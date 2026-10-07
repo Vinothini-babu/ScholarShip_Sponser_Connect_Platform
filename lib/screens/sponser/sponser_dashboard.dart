@@ -12,6 +12,7 @@ import 'sponsor_profile_screen.dart';
 import 'dashboard/approved_students_screen.dart';
 import 'dashboard/student_suggestions.dart';
 import '../student/notification_screen.dart';
+import '../common/feedback_screen.dart';
 import '../../services/application_service.dart';
 
 class SponsorDashboard extends StatefulWidget {
@@ -92,6 +93,12 @@ class _SponsorDashboardState extends State<SponsorDashboard>
                     children: [
                       // Blinking suggestion / quote card
                       _reveal(1, StudentSuggestionSection(sponsorId: uid)),
+
+                      // "How was reviewing this application?" after approve / reject
+                      const FeedbackPromptCard(
+                        isSponsor: true,
+                        padding: EdgeInsets.only(top: 16),
+                      ),
                       const SizedBox(height: 28),
 
                       const _SectionTitle(title: "Quick Actions"),
@@ -140,6 +147,17 @@ class _SponsorDashboardState extends State<SponsorDashboard>
                               MaterialPageRoute(builder: (_) => const SponsorProfileScreen()),
                             ),
                             ),
+                            (
+                            icon: Icons.lightbulb_outline_rounded,
+                            title: "Report / Suggest",
+                            subtitle: "Report an issue or share an idea",
+                            gradient: [Colors.indigo, Colors.indigo.withOpacity(0.75)],
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const FeedbackScreen(isSponsor: true)),
+                            ),
+                            ),
                           ];
 
                           final actions = [
@@ -175,6 +193,12 @@ class _SponsorDashboardState extends State<SponsorDashboard>
                                   Expanded(child: actions[2]),
                                   SizedBox(width: gap),
                                   Expanded(child: actions[3]),
+                                ],
+                              ),
+                              SizedBox(height: gap),
+                              Row(
+                                children: [
+                                  Expanded(child: actions[4]),
                                 ],
                               ),
                             ],
