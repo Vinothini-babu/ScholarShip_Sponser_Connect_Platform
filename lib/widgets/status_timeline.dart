@@ -57,7 +57,8 @@ class _Stage {
   final _StageState state;
   final DateTime? timestamp;
   final String? note;
-  const _Stage(this.label, this.state, {this.timestamp, this.note});
+  final String? hint; // shown instead of "In progress"/"Pending" when no date
+  const _Stage(this.label, this.state, {this.timestamp, this.note, this.hint});
 }
 
 /// Flipkart/e-commerce-style order-tracking card: collapsible header with
@@ -68,11 +69,16 @@ class StatusTimeline extends StatefulWidget {
   final String currentStatus; // "Pending" | "Approved" | "Rejected"
   final DateTime? appliedAt;
 
+  /// applications/{id}.payment map: { status: "Paid" | "Received",
+  /// paidAt: Timestamp, receivedAt: Timestamp, ... } (null = not paid yet)
+  final Map<String, dynamic>? payment;
+
   const StatusTimeline({
     super.key,
     required this.history,
     required this.currentStatus,
     this.appliedAt,
+    this.payment,
   });
 
   @override
@@ -89,6 +95,17 @@ class _StatusTimelineState extends State<StatusTimeline> {
     return null;
   }
 
+  String get _payStatus => widget.payment?['status']?.toString() ?? '';
+  DateTime? get _paidAt {
+    final t = widget.payment?['paidAt'] ?? widget.payment?['date'];
+    return t is Timestamp ? t.toDate() : null;
+  }
+
+  DateTime? get _receivedAt {
+    final t = widget.payment?['receivedAt'];
+    return t is Timestamp ? t.toDate() : null;
+  }
+
   List<_Stage> get _stages {
     final reviewEntry = _entryFor('Under Review');
     final decisionEntry = _entryFor(widget.currentStatus);
@@ -102,6 +119,17 @@ class _StatusTimelineState extends State<StatusTimeline> {
           _Stage('Under Review', _StageState.completed, timestamp: reviewEntry?.timestamp),
           _Stage('Approved', _StageState.completed,
               timestamp: decisionEntry?.timestamp, note: decisionEntry?.note),
+          // ---- fund disbursement stages ----
+          if (_payStatus == 'Paid' || _payStatus == 'Received')
+            _Stage('Paid', _StageState.completed, timestamp: _paidAt)
+          else
+            const _Stage('Paid', _StageState.active, hint: 'Awaiting'),
+          if (_payStatus == 'Received')
+            _Stage('Received', _StageState.completed, timestamp: _receivedAt)
+          else if (_payStatus == 'Paid')
+            const _Stage('Received', _StageState.active, hint: 'Confirm')
+          else
+            const _Stage('Received', _StageState.notStarted),
         ];
       case 'rejected':
         return [
@@ -137,6 +165,12 @@ class _StatusTimelineState extends State<StatusTimeline> {
   (String, String) get _headline {
     switch (widget.currentStatus.toLowerCase()) {
       case 'approved':
+        if (_payStatus == 'Received') {
+          return ("Scholarship Received", "The scholarship amount has reached you. All the best!");
+        }
+        if (_payStatus == 'Paid') {
+          return ("Payment Sent", "The sponsor has sent your scholarship amount.");
+        }
         return ("Application Approved", "Congratulations! Your application has been approved.");
       case 'rejected':
         return ("Application Not Approved", "Your application was not approved this time.");
@@ -157,7 +191,13 @@ class _StatusTimelineState extends State<StatusTimeline> {
 
     switch (widget.currentStatus.toLowerCase()) {
       case 'approved':
-        return "You'll be notified with next steps for receiving your scholarship benefits.";
+        if (_payStatus == 'Received') {
+          return "Payment confirmed. Upload your marksheet each semester to continue the scholarship.";
+        }
+        if (_payStatus == 'Paid') {
+          return "Please confirm below once the amount reaches your account.";
+        }
+        return "The sponsor will release your scholarship payment soon.";
       case 'rejected':
         return "You can reach out to the sponsor for more details on this decision.";
       default:
@@ -240,32 +280,36 @@ class _StatusTimelineState extends State<StatusTimeline> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // ---- Horizontal tracker ----
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (int i = 0; i < stages.length; i++) ...[
-                        _buildNode(stages[i]),
-                        if (i != stages.length - 1)
-                          Expanded(
-                            child: SizedBox(
-                              height: _nodeSize,
-                              child: Center(
-                                child: Container(
-                                  height: 3,
-                                  decoration: BoxDecoration(
-                                    color: (stages[i].state == _StageState.completed ||
-                                        stages[i].state == _StageState.rejected)
-                                        ? _colorFor(stages[i].state)
-                                        : Colors.grey.shade300,
-                                    borderRadius: BorderRadius.circular(2),
+                  LayoutBuilder(builder: (context, c) {
+                    final n = stages.length;
+                    final nodeW = ((c.maxWidth - (n - 1) * 10) / n).clamp(52.0, 74.0);
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (int i = 0; i < stages.length; i++) ...[
+                          _buildNode(stages[i], nodeW),
+                          if (i != stages.length - 1)
+                            Expanded(
+                              child: SizedBox(
+                                height: _nodeSize,
+                                child: Center(
+                                  child: Container(
+                                    height: 3,
+                                    decoration: BoxDecoration(
+                                      color: (stages[i].state == _StageState.completed ||
+                                          stages[i].state == _StageState.rejected)
+                                          ? _colorFor(stages[i].state)
+                                          : Colors.grey.shade300,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
+                        ],
                       ],
-                    ],
-                  ),
+                    );
+                  }),
 
                   if (_infoNote != null) ...[
                     const SizedBox(height: 16),
@@ -322,7 +366,7 @@ class _StatusTimelineState extends State<StatusTimeline> {
     );
   }
 
-  Widget _buildNode(_Stage stage) {
+  Widget _buildNode(_Stage stage, double width) {
     final color = _colorFor(stage.state);
     final bool isFilled = stage.state != _StageState.notStarted;
 
@@ -348,6 +392,8 @@ class _StatusTimelineState extends State<StatusTimeline> {
 
     final String subtitle = stage.timestamp != null
         ? "${_dateShort(stage.timestamp!)}\n${_timeShort(stage.timestamp!)}"
+        : stage.hint != null
+        ? stage.hint!
         : stage.state == _StageState.active
         ? "In progress"
         : stage.state == _StageState.rejected
@@ -355,7 +401,7 @@ class _StatusTimelineState extends State<StatusTimeline> {
         : "Pending";
 
     return SizedBox(
-      width: 74,
+      width: width,
       child: Column(
         children: [
           Container(

@@ -438,11 +438,33 @@ class _AddScholarshipScreenState
                       return;
                     }
 
+                    final user = FirebaseAuth.instance.currentUser!;
+
+                    // Safety guard: only admin-verified sponsors may publish.
+                    // (Sponsors without a verificationStatus field are old
+                    // accounts and are treated as verified.)
+                    final profile = await FirebaseFirestore.instance
+                        .collection("users")
+                        .doc(user.uid)
+                        .get();
+                    final vStatus =
+                    (profile.data()?["verificationStatus"] ?? "verified")
+                        .toString();
+                    if (vStatus != "verified") {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(vStatus == "rejected"
+                              ? "Your sponsor account was rejected by the admin. You cannot publish scholarships."
+                              : "Your account is awaiting admin verification. You can publish scholarships once it is verified."),
+                        ),
+                      );
+                      return;
+                    }
+
                     setState(() {
                       isLoading = true;
                     });
-
-                    final user = FirebaseAuth.instance.currentUser!;
 
                     await FirebaseFirestore.instance
                         .collection("scholarships")

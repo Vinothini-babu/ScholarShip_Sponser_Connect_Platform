@@ -142,6 +142,13 @@ class AuthService {
           proofDocumentUrl.trim();
     }
 
+    // New sponsors must be verified by an admin before publishing
+    // scholarships. (Existing sponsors without this field are treated
+    // as verified by the app.)
+    if (userRole == "sponsor") {
+      userData["verificationStatus"] = "pending";
+    }
+
     // ==========================================================
     // 5. SAVE COMMON USER DATA
     //
@@ -229,6 +236,7 @@ class AuthService {
         "email": email.trim(),
         "mobile": mobile.trim(),
         "certificateUrl": (proofDocumentUrl ?? "").trim(),
+        "verificationStatus": "pending",
         "role": "sponsor",
         "createdAt": FieldValue.serverTimestamp(),
       };

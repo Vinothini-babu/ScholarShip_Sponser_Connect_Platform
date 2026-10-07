@@ -91,6 +91,9 @@ class _SponsorDashboardState extends State<SponsorDashboard>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Admin verification status banner (pending / rejected only)
+                      _VerificationBanner(uid: uid),
+
                       // Blinking suggestion / quote card
                       _reveal(1, StudentSuggestionSection(sponsorId: uid)),
 
@@ -113,10 +116,29 @@ class _SponsorDashboardState extends State<SponsorDashboard>
                             title: "Add Scholarship",
                             subtitle: "Publish a new opportunity",
                             gradient: [AppColors.primary, AppColors.primary.withOpacity(0.75)],
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const AddScholarshipScreen()),
-                            ),
+                            onTap: () async {
+                              final snap = await FirebaseFirestore.instance
+                                  .collection("users")
+                                  .doc(uid)
+                                  .get();
+                              final v = (snap.data()?["verificationStatus"] ?? "verified")
+                                  .toString();
+                              if (!context.mounted) return;
+                              if (v != "verified") {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(v == "rejected"
+                                        ? "Your account was rejected by the admin, so you cannot add scholarships."
+                                        : "Your account is awaiting admin verification. You can add scholarships once it is verified."),
+                                  ),
+                                );
+                                return;
+                              }
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const AddScholarshipScreen()),
+                              );
+                            },
                             ),
                             (
                             icon: Icons.list_alt_rounded,
@@ -568,11 +590,13 @@ class _SponsorHeaderState extends State<_SponsorHeader>
                     builder: (context, snapshot) {
                       String orgName = "Sponsor";
                       String? logoUrl;
+                      String vStatus = "verified"; // old accounts = verified
 
                       if (snapshot.hasData && snapshot.data!.exists) {
                         final data = snapshot.data!.data() as Map<String, dynamic>?;
                         orgName = (data?["organizationName"] ?? data?["name"] ?? "Sponsor").toString();
                         logoUrl = data?["logoUrl"] as String?;
+                        vStatus = (data?["verificationStatus"] ?? "verified").toString();
                       }
 
                       final hasLogo = logoUrl != null && logoUrl.isNotEmpty;
@@ -642,29 +666,74 @@ class _SponsorHeaderState extends State<_SponsorHeader>
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.13),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: gold.withOpacity(0.5)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.workspace_premium_rounded, size: 14, color: gold),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          "Scholarship Sponsor",
-                                          style: AppTextStyles.subtitle.copyWith(
-                                            color: Colors.white.withOpacity(0.92),
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            letterSpacing: 0.3,
-                                          ),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 6,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.13),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(color: gold.withOpacity(0.5)),
                                         ),
-                                      ],
-                                    ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.workspace_premium_rounded, size: 14, color: gold),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              "Scholarship Sponsor",
+                                              style: AppTextStyles.subtitle.copyWith(
+                                                color: Colors.white.withOpacity(0.92),
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                                letterSpacing: 0.3,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          color: (vStatus == "verified"
+                                              ? const Color(0xFF2E7D5B)
+                                              : vStatus == "rejected"
+                                              ? const Color(0xFFC0392B)
+                                              : const Color(0xFFE08A1E))
+                                              .withOpacity(0.92),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              vStatus == "verified"
+                                                  ? Icons.verified_rounded
+                                                  : vStatus == "rejected"
+                                                  ? Icons.cancel_rounded
+                                                  : Icons.hourglass_top_rounded,
+                                              size: 14,
+                                              color: Colors.white,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              vStatus == "verified"
+                                                  ? "Verified Sponsor"
+                                                  : vStatus == "rejected"
+                                                  ? "Verification Rejected"
+                                                  : "Verification Pending",
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -675,6 +744,77 @@ class _SponsorHeaderState extends State<_SponsorHeader>
                     },
                   ),
                 ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ==============================
+// VERIFICATION BANNER (shown only while pending / rejected)
+// users/{uid}.verificationStatus: pending | verified | rejected
+// ==============================
+class _VerificationBanner extends StatelessWidget {
+  final String uid;
+  const _VerificationBanner({required this.uid});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance.collection("users").doc(uid).snapshots(),
+      builder: (context, snap) {
+        final data = snap.data?.data();
+        final status = (data?["verificationStatus"] ?? "verified").toString();
+        if (status == "verified") return const SizedBox.shrink();
+
+        final rejected = status == "rejected";
+        final color = rejected ? const Color(0xFFC0392B) : const Color(0xFFE08A1E);
+        final reason = (data?["rejectionReason"] ?? "").toString().trim();
+
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: color.withOpacity(0.45)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                child: Icon(
+                  rejected ? Icons.gpp_bad_rounded : Icons.hourglass_top_rounded,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                rejected
+                    ? "Your sponsor account was not verified"
+                    : "Your account is awaiting admin verification",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                rejected
+                    ? (reason.isEmpty
+                    ? "Please contact the admin for details."
+                    : "Reason: $reason")
+                    : "You can add scholarships as soon as the admin verifies your organization.",
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF475569)),
               ),
             ],
           ),

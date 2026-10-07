@@ -662,6 +662,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           ),
         ),
       ),
+      // Sponsors waiting for admin verification (live count)
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection("users")
+            .where("role", isEqualTo: "sponsor")
+            .where("verificationStatus", isEqualTo: "pending")
+            .snapshots(),
+        builder: (context, snap) {
+          final n = snap.data?.docs.length ?? 0;
+          return _QuickActionCard(
+            icon: Icons.verified_user_rounded,
+            title: "Verify Sponsors",
+            subtitle: n > 0 ? "$n awaiting verification" : "All sponsors reviewed",
+            color: Colors.teal,
+            highlighted: n > 0,
+            onTap: () => _go(const ManageSponsorsScreen()),
+          );
+        },
+      ),
       StreamBuilder<int>(
         stream: FeedbackService().newCount(),
         builder: (context, snap) {

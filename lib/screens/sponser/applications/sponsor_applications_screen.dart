@@ -6,6 +6,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../models/application_model.dart';
 import '../../../services/application_service.dart';
 import 'application_details_screen.dart';
+import '../../common/chat_screen.dart';
 
 /// Reads totalScore from the application data (0 for older applications
 /// that were submitted before scoring existed).

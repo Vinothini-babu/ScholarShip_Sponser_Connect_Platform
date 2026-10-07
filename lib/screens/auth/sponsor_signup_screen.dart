@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:file_picker/file_picker.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -107,6 +110,55 @@ class _SponsorSignupScreenState extends State<SponsorSignupScreen> {
   }
 
   // ------------------------------------------------------------
+  // Cloudinary upload (registration certificate)
+  //
+  // Use the SAME cloud name + unsigned upload preset that the student
+  // apply flow already uses.
+  // ------------------------------------------------------------
+
+  static const String _cloudName = 'YOUR_CLOUD_NAME';
+  static const String _uploadPreset = 'YOUR_UPLOAD_PRESET';
+
+  Future<String> _uploadProofToCloudinary(PlatformFile file) async {
+    final uri = Uri.parse(
+      'https://api.cloudinary.com/v1_1/$_cloudName/auto/upload',
+    );
+
+    final request = http.MultipartRequest('POST', uri)
+      ..fields['upload_preset'] = _uploadPreset;
+
+    final String? path = file.path;
+    if (path == null || path.isEmpty) {
+      throw Exception('Unable to read the selected file.');
+    }
+
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'file',
+        path,
+        filename: file.name,
+      ),
+    );
+
+    final response = await http.Response.fromStream(await request.send());
+    final Map<String, dynamic> body =
+    jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode != 200) {
+      final msg = (body['error'] is Map)
+          ? body['error']['message']?.toString()
+          : null;
+      throw Exception(msg ?? 'Upload failed (${response.statusCode})');
+    }
+
+    final url = body['secure_url']?.toString() ?? '';
+    if (url.isEmpty) {
+      throw Exception('Upload succeeded but no URL was returned.');
+    }
+    return url;
+  }
+
+  // ------------------------------------------------------------
   // File Picker
   // ------------------------------------------------------------
 
@@ -160,6 +212,15 @@ class _SponsorSignupScreenState extends State<SponsorSignupScreen> {
       return;
     }
 
+    if (registrationCertificate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please upload your registration certificate.'),
+        ),
+      );
+      return;
+    }
+
     if (!agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -180,6 +241,10 @@ class _SponsorSignupScreenState extends State<SponsorSignupScreen> {
       // FIREBASE SPONSOR ACCOUNT CREATION
       // ==========================================================
 
+      // Upload proof first so the admin can open it from any computer
+      final String proofUrl =
+      await _uploadProofToCloudinary(registrationCertificate!);
+
       final AuthService authService = AuthService();
 
       await authService.signUp(
@@ -195,7 +260,7 @@ class _SponsorSignupScreenState extends State<SponsorSignupScreen> {
         district: districtController.text.trim(),
         organizationName: organizationController.text.trim(),
         registrationNumber: registrationController.text.trim(),
-        proofDocumentUrl: registrationCertificate?.path ?? '',
+        proofDocumentUrl: proofUrl,
       );
 
       if (!mounted) return;
