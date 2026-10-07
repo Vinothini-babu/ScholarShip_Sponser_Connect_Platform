@@ -8,11 +8,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../services/notification_service.dart';
+import '../../services/deadline_reminder_service.dart';
 import 'all_scholarships_screen.dart';
 import 'my_applications_screen.dart';
 import 'scholarship_applications_screen.dart';
 import '../common/feedback_screen.dart';
 import 'scholarship_info_screen.dart';
+import 'ticket_detail_screen.dart';
 import '../../utils/eligibility_utils.dart';
 
 // =========================================================
@@ -3430,6 +3432,8 @@ class _InviteBannerHostState extends State<InviteBannerHost> {
     _subUid = uid;
     if (uid == null) return;
 
+    DeadlineReminderService.runFor(uid);
+
     _sub = _service.streamFor(uid).listen((snap) {
       final list = snap.docs.where((d) {
         final m = d.data();
@@ -3507,7 +3511,24 @@ class _InviteBannerHostState extends State<InviteBannerHost> {
     if (!mounted) return;
 
     final type = (data["type"] ?? "").toString();
-    if (type == "invite") {
+    if (type == "ticket_reply") {
+      final tid = (data["ticketId"] ?? "").toString();
+      if (tid.isNotEmpty) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => TicketDetailScreen(ticketId: tid)),
+        );
+      }
+    } else if (type == "deadline_reminder") {
+      final sid = (data["scholarshipId"] ?? "").toString();
+      if (sid.isNotEmpty) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => ScholarshipInfoScreen(scholarshipId: sid)),
+        );
+      }
+    } else if (type == "invite") {
       showInviteDialog(context, data);
     } else {
       Navigator.push(
@@ -4005,6 +4026,10 @@ class _NotificationCard extends StatelessWidget {
         return (icon: Icons.alarm_rounded, color: AppColors.secondary);
       case "feedback_reply":
         return (icon: Icons.forum_rounded, color: AppColors.secondary);
+      case "ticket_reply":
+        return (icon: Icons.support_agent_rounded, color: AppColors.primary);
+      case "deadline_reminder":
+        return (icon: Icons.alarm_rounded, color: AppColors.error);
       case "applied":
       case "application_received":
         return (icon: Icons.description_rounded, color: AppColors.primary);
@@ -4048,6 +4073,29 @@ class _NotificationCard extends StatelessWidget {
 
     if (type == "feedback_reply") {
       showFeedbackReplyDialog(context, data);
+      return;
+    }
+
+    if (type == "ticket_reply") {
+      final tid = (data["ticketId"] ?? "").toString();
+      if (tid.isNotEmpty) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => TicketDetailScreen(ticketId: tid)),
+        );
+      }
+      return;
+    }
+
+    if (type == "deadline_reminder") {
+      final sid = (data["scholarshipId"] ?? "").toString();
+      if (sid.isNotEmpty) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => ScholarshipInfoScreen(scholarshipId: sid)),
+        );
+      }
       return;
     }
 

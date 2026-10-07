@@ -15,6 +15,7 @@ import 'view_applications_screen.dart';
 import 'reports_screen.dart';
 import 'contact_directory_screen.dart';
 import 'admin_feedback_screen.dart';
+import 'admin_support_tickets_screen.dart';
 import '../../services/feedback_service.dart';
 
 // ================================================================
@@ -692,6 +693,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             color: Colors.amber.shade800,
             highlighted: n > 0,
             onTap: () => _go(const AdminFeedbackScreen()),
+          );
+        },
+      ),
+      // Open support tickets (live count)
+      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection("support_tickets")
+            .where("status", isEqualTo: "Open")
+            .snapshots(),
+        builder: (context, snap) {
+          final n = snap.data?.docs.length ?? 0;
+          return _QuickActionCard(
+            icon: Icons.support_agent_rounded,
+            title: "Support Tickets",
+            subtitle: n > 0 ? "$n open tickets" : "Student queries & replies",
+            color: Colors.deepPurple,
+            highlighted: n > 0,
+            onTap: () => _go(const AdminSupportTicketsScreen()),
           );
         },
       ),

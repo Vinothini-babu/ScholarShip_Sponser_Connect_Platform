@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 
+import 'report_analytics.dart';
 import 'report_detail_screen.dart';
 import 'view_applications_screen.dart';
 
@@ -147,6 +148,7 @@ class _ReportData {
   final int rejected;
   final double totalFunds;
   final List<_SponsorStat> topSponsors;
+  final List<SponsorFund> sponsorFunds;
 
   const _ReportData({
     required this.students,
@@ -158,6 +160,7 @@ class _ReportData {
     required this.rejected,
     required this.totalFunds,
     required this.topSponsors,
+    required this.sponsorFunds,
   });
 
   factory _ReportData.from({
@@ -297,8 +300,27 @@ class _ReportData {
       rejected: rejected,
       totalFunds: funds,
       topSponsors: top.take(5).toList(),
+      sponsorFunds: top
+          .map((s) => SponsorFund(
+        name: s.name,
+        funds: s.funds,
+        scholarships: s.scholarships,
+      ))
+          .toList(),
     );
   }
+
+  ReportAnalyticsData toAnalytics() => ReportAnalyticsData.build(
+    applications: applications,
+    sponsorFunds: sponsorFunds,
+    students: students.length,
+    sponsors: sponsors.length,
+    scholarships: scholarships.length,
+    approved: approved,
+    pending: pending,
+    rejected: rejected,
+    totalFunds: totalFunds,
+  );
 
   int get totalApplications => applications.length;
 
@@ -597,6 +619,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
   // CONTENT
   // ============================================================
 
+  bool _exporting = false;
+
+  Future<void> _exportPdf(_ReportData d) async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      await exportReportPdf(d.toAnalytics());
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Could not create PDF: $e")),
+        );
+      }
+    }
+    if (mounted) setState(() => _exporting = false);
+  }
+
   Widget _content(BuildContext context, _ReportData d, bool loading) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -688,6 +727,38 @@ class _ReportsScreenState extends State<ReportsScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton.icon(
+                onPressed: (loading || _exporting) ? null : () => _exportPdf(d),
+                icon: _exporting
+                    ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+                    : const Icon(Icons.picture_as_pdf_rounded, size: 18),
+                label: Text(_exporting ? "Preparing..." : "Download PDF"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _navy,
+                  minimumSize: const Size(0, 46),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
             _cardGrid(summary, wide ? 4 : 2),
 
             const SizedBox(height: 28),
@@ -721,6 +792,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
             _FadeSlideIn(
               delayMs: 500,
               child: _statusPanel(context, d, wide),
+            ),
+
+            const SizedBox(height: 28),
+
+            const _SectionHeading(
+              title: "Analytics",
+              subtitle: "Applications trend, popular scholarships and sponsor funding",
+            ),
+            const SizedBox(height: 14),
+            _FadeSlideIn(
+              delayMs: 540,
+              child: ReportAnalyticsSection(data: d.toAnalytics()),
             ),
 
             const SizedBox(height: 28),

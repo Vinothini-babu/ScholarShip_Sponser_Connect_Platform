@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../utils/contact_actions.dart';
+import 'ticket_detail_screen.dart';
 /// Support & Help screen — FAQ, direct contact options (call / email /
 /// WhatsApp), and a simple "raise a ticket" system backed by Firestore
 /// (support_tickets collection) so students get a real response trail
@@ -240,7 +241,7 @@ class _SupportScreenState extends State<SupportScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        "Our team will get back to you by email.",
+                        "Our team will reply here. Tap a ticket below to view replies.",
                         style: AppTextStyles.subtitle.copyWith(fontSize: 12),
                       ),
                       const SizedBox(height: 14),
@@ -338,7 +339,6 @@ class _SupportScreenState extends State<SupportScreen> {
                           stream: FirebaseFirestore.instance
                               .collection("support_tickets")
                               .where("studentId", isEqualTo: uid)
-                              .orderBy("createdAt", descending: true)
                               .snapshots(),
                           builder: (context, snap) {
                             if (snap.connectionState ==
@@ -353,7 +353,23 @@ class _SupportScreenState extends State<SupportScreen> {
                               );
                             }
 
-                            final docs = snap.data?.docs ?? [];
+                            if (snap.hasError) {
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                child: Text(
+                                  "Could not load tickets: ${snap.error}",
+                                  style: AppTextStyles.subtitle,
+                                ),
+                              );
+                            }
+
+                            // newest first (sorted here so no Firestore
+                            // composite index is needed)
+                            final docs = [...(snap.data?.docs ?? [])];
+                            int ms(dynamic v) =>
+                                v is Timestamp ? v.millisecondsSinceEpoch : 1 << 62;
+                            docs.sort((a, b) => ms(b.data()["createdAt"])
+                                .compareTo(ms(a.data()["createdAt"])));
 
                             if (docs.isEmpty) {
                               return Padding(
@@ -370,7 +386,19 @@ class _SupportScreenState extends State<SupportScreen> {
                                 for (final doc in docs)
                                   Padding(
                                     padding: const EdgeInsets.only(bottom: 10),
-                                    child: _TicketTile(data: doc.data()),
+                                    child: MouseRegion(
+                                      cursor: SystemMouseCursors.click,
+                                      child: GestureDetector(
+                                        onTap: () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => TicketDetailScreen(
+                                                ticketId: doc.id),
+                                          ),
+                                        ),
+                                        child: _TicketTile(data: doc.data()),
+                                      ),
+                                    ),
                                   ),
                               ],
                             );
