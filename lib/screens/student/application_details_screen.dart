@@ -8,6 +8,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../services/application_service.dart';
 import '../../../services/notification_service.dart';
 import 'package:scholarship_sponser_connect_platform/screens/common/chat_screen.dart';
+import '../common/thank_you_sheet.dart';
 
 class ApplicationDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> data;

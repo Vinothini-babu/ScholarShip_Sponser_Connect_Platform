@@ -678,6 +678,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             subtitle: n > 0 ? "$n awaiting verification" : "All sponsors reviewed",
             color: Colors.teal,
             highlighted: n > 0,
+            themed: true,
+            gradientColors: [Colors.teal.shade500, const Color(0xFF065F46)],
             onTap: () => _go(const ManageSponsorsScreen()),
           );
         },
@@ -692,6 +694,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             subtitle: n > 0 ? "$n new to review" : "Ratings & comments",
             color: Colors.amber.shade800,
             highlighted: n > 0,
+            themed: true,
+            gradientColors: [Colors.orange.shade600, Colors.deepOrange.shade700],
             onTap: () => _go(const AdminFeedbackScreen()),
           );
         },
@@ -2291,6 +2295,11 @@ class _QuickActionCard extends StatefulWidget {
   final String subtitle;
   final Color color;
   final bool highlighted;
+
+  /// Always painted with a gradient theme (even when nothing needs attention).
+  /// The gold star still shows only when [highlighted] is true.
+  final bool themed;
+  final List<Color>? gradientColors;
   final VoidCallback onTap;
 
   const _QuickActionCard({
@@ -2300,6 +2309,8 @@ class _QuickActionCard extends StatefulWidget {
     required this.color,
     required this.onTap,
     this.highlighted = false,
+    this.themed = false,
+    this.gradientColors,
   });
 
   @override
@@ -2313,11 +2324,14 @@ class _QuickActionCardState extends State<_QuickActionCard> {
   Widget build(BuildContext context) {
     final color = widget.color;
     final hi = widget.highlighted;
+    final filled = hi || widget.themed; // gradient background
     final radius = BorderRadius.circular(18);
+    final gradColors = widget.gradientColors ??
+        [color, Color.lerp(color, Colors.black, 0.28)!];
 
-    final titleColor = hi ? Colors.white : AppColors.textPrimary;
+    final titleColor = filled ? Colors.white : AppColors.textPrimary;
     final subColor =
-    hi ? Colors.white.withOpacity(0.8) : AppColors.textSecondary;
+    filled ? Colors.white.withOpacity(0.8) : AppColors.textSecondary;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -2332,24 +2346,27 @@ class _QuickActionCardState extends State<_QuickActionCard> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.all(16),
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              color: hi ? null : AppColors.card,
-              gradient: hi
+              color: filled ? null : AppColors.card,
+              gradient: filled
                   ? LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [color, Color.lerp(color, Colors.black, 0.28)!],
+                colors: gradColors,
               )
                   : null,
               borderRadius: radius,
               border: Border.all(
                 color: hi
                     ? AppColors.secondary.withOpacity(0.6)
-                    : color.withOpacity(_hovering ? 0.40 : 0.15),
+                    : (filled
+                    ? Colors.white.withOpacity(0.25)
+                    : color.withOpacity(_hovering ? 0.40 : 0.15)),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: hi
+                  color: filled
                       ? color.withOpacity(_hovering ? 0.45 : 0.30)
                       : Colors.black.withOpacity(_hovering ? 0.09 : 0.04),
                   blurRadius: _hovering ? 20 : 12,
@@ -2357,78 +2374,109 @@ class _QuickActionCardState extends State<_QuickActionCard> {
                 ),
               ],
             ),
-            child: Row(
+            child: Stack(
               children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 44,
-                  height: 44,
-                  transform: Matrix4.identity()..scale(_hovering ? 1.1 : 1.0),
-                  transformAlignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    gradient: hi
-                        ? null
-                        : LinearGradient(
-                      colors: [color, color.withOpacity(0.75)],
+                if (widget.themed) ...[
+                  // soft decorative circles for the themed look
+                  Positioned(
+                    right: -22,
+                    top: -26,
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.09),
+                      ),
                     ),
-                    color: hi ? Colors.white.withOpacity(0.18) : null,
-                    borderRadius: BorderRadius.circular(13),
                   ),
-                  child: Icon(widget.icon, color: Colors.white, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                  Positioned(
+                    right: 34,
+                    bottom: -34,
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.06),
+                      ),
+                    ),
+                  ),
+                ],
+                Row(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 44,
+                      height: 44,
+                      transform: Matrix4.identity()..scale(_hovering ? 1.1 : 1.0),
+                      transformAlignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        gradient: filled
+                            ? null
+                            : LinearGradient(
+                          colors: [color, color.withOpacity(0.75)],
+                        ),
+                        color: filled ? Colors.white.withOpacity(0.18) : null,
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: Icon(widget.icon, color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Flexible(
-                            child: Text(
-                              widget.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.subtitle.copyWith(
-                                color: titleColor,
-                                fontWeight: FontWeight.bold,
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  widget.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.subtitle.copyWith(
+                                    color: titleColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
+                              if (hi) ...[
+                                const SizedBox(width: 6),
+                                Icon(
+                                  Icons.star_rounded,
+                                  size: 15,
+                                  color: AppColors.secondary,
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            widget.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.subtitle.copyWith(
+                              fontSize: 11,
+                              color: subColor,
                             ),
                           ),
-                          if (hi) ...[
-                            const SizedBox(width: 6),
-                            Icon(
-                              Icons.star_rounded,
-                              size: 15,
-                              color: AppColors.secondary,
-                            ),
-                          ],
                         ],
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        widget.subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.subtitle.copyWith(
-                          fontSize: 11,
-                          color: subColor,
-                        ),
+                    ),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      transform: Matrix4.translationValues(
+                        _hovering ? 3 : 0,
+                        0,
+                        0,
                       ),
-                    ],
-                  ),
-                ),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  transform: Matrix4.translationValues(
-                    _hovering ? 3 : 0,
-                    0,
-                    0,
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 13,
-                    color: hi ? Colors.white : AppColors.textSecondary,
-                  ),
+                      child: Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 13,
+                        color: filled ? Colors.white : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

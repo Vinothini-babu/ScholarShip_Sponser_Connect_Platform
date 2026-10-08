@@ -7,6 +7,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../services/application_service.dart';
 import '../../../services/notification_service.dart';
+import '../../common/thank_you_sheet.dart';
 
 class ApplicationDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -874,6 +875,8 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
                       // before that), so it's gated on status == "Approved".
                       if (status == "Approved") ...[
                         const SizedBox(height: 22),
+                        SponsorThankYouCard(applicationId: widget.applicationId),
+                        const SizedBox(height: 12),
                         _buildSemesterUpdatesSection(),
                       ],
 

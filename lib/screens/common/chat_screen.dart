@@ -31,13 +31,14 @@ class _ChatScreenState extends State<ChatScreen> {
   final ChatService _chat = ChatService();
   final TextEditingController _controller = TextEditingController();
 
+  late String _role;
   bool _sending = false;
   String? _lastSyncedId;
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _messagesStream;
 
   String get _uid => FirebaseAuth.instance.currentUser?.uid ?? "";
 
-  List<String> get _quickReplies => widget.myRole == "sponsor"
+  List<String> get _quickReplies => _role == "sponsor"
       ? const [
     "Please re-upload a clearer copy of your marksheet.",
     "One of your documents is missing. Please upload it.",
@@ -52,8 +53,13 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _role = widget.myRole;
+    // decide the real role from the logged-in user (safety net)
+    _chat.roleFor(widget.applicationId, widget.myRole).then((r) {
+      if (mounted && r != _role) setState(() => _role = r);
+    });
     _messagesStream = _chat.messages(widget.applicationId);
-    _chat.markRead(widget.applicationId, widget.myRole);
+    _chat.markRead(widget.applicationId, _role);
   }
 
   @override
@@ -85,11 +91,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   /// A new message from the other person arrived while this screen is open.
   void _syncRead(String newestId, Map<String, dynamic> newest) {
-    if ((newest["senderRole"] ?? "") == widget.myRole) return;
+    if ((newest["senderRole"] ?? "") == _role) return;
     if (_lastSyncedId == newestId) return;
     _lastSyncedId = newestId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _chat.markRead(widget.applicationId, widget.myRole);
+      _chat.markRead(widget.applicationId, _role);
     });
   }
 
@@ -102,7 +108,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final error = await _chat.send(
       applicationId: widget.applicationId,
-      myRole: widget.myRole,
+      myRole: _role,
       text: text,
     );
 
@@ -151,7 +157,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildHeader() {
     final rawName = widget.otherName.trim();
     final name = rawName.isEmpty
-        ? (widget.myRole == "sponsor" ? "Student" : "Sponsor")
+        ? (_role == "sponsor" ? "Student" : "Sponsor")
         : rawName;
     final initial = name.isEmpty ? "?" : name[0].toUpperCase();
 
@@ -388,7 +394,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildEmptyState() {
-    final sponsor = widget.myRole == "sponsor";
+    final sponsor = _role == "sponsor";
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(30),
@@ -575,12 +581,20 @@ class ChatEntryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = myRole == "sponsor" ? "Message Student" : "Message Sponsor";
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? "";
 
-    return StreamBuilder<int>(
-      stream: ChatService().unreadFor(applicationId, myRole),
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection("applications")
+          .doc(applicationId)
+          .snapshots(),
       builder: (context, snap) {
-        final unread = snap.data ?? 0;
+        final app = snap.data?.data();
+        // role comes from the logged-in user, not from the caller
+        final role = ChatService.roleOf(app, uid, myRole);
+        final unread = app == null ? 0 : ChatService.unreadCount(app, role);
+        final label =
+        role == "sponsor" ? "Message Student" : "Message Sponsor";
 
         return SizedBox(
           width: double.infinity,
@@ -592,8 +606,9 @@ class ChatEntryButton extends StatelessWidget {
                 MaterialPageRoute(
                   builder: (_) => ChatScreen(
                     applicationId: applicationId,
-                    myRole: myRole,
-                    otherName: otherName,
+                    myRole: role,
+                    // if the caller passed the wrong role, its name is wrong too
+                    otherName: role == myRole ? otherName : "",
                     scholarshipTitle: scholarshipTitle,
                   ),
                 ),

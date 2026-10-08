@@ -256,4 +256,80 @@ class ApplicationService {
     await batch.commit();
     return null;
   }
+
+  // =========================================================
+  // THANK-YOU NOTE - STUDENT -> SPONSOR
+  // Returns null on success, or an error message.
+  // =========================================================
+
+  Future<String?> sendThankYou({
+    required String applicationId,
+    required String message,
+  }) async {
+    final text = message.trim();
+    if (text.isEmpty) return "Please write a message first.";
+    if (text.length > 300) return "Message is too long (max 300 characters).";
+
+    final ref = _firestore.collection('applications').doc(applicationId);
+
+    try {
+      Map<String, dynamic>? appData;
+
+      await _firestore.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        final d = snap.data();
+        if (d == null) throw "Application not found.";
+        if (d['status'] != 'Approved') {
+          throw "You can send a thank-you only after approval.";
+        }
+        if (d['thankYouSent'] == true) {
+          throw "You have already sent a thank-you note.";
+        }
+        appData = d;
+        tx.update(ref, {
+          'thankYouSent': true,
+          'thankYouMessage': text,
+          'thankYouAt': FieldValue.serverTimestamp(),
+        });
+      });
+
+      // notify the sponsor (best effort, never fails the thank-you)
+      try {
+        final d = appData ?? <String, dynamic>{};
+        final sponsorId = (d['sponsorId'] ?? '').toString();
+        if (sponsorId.isNotEmpty) {
+          final studentId = (d['studentId'] ?? d['uid'] ?? '').toString();
+          var who = (d['studentName'] ?? '').toString().trim();
+          if (who.isEmpty && studentId.isNotEmpty) {
+            // studentName can be empty on the application -> read it from the profile
+            final u = await _firestore.collection('users').doc(studentId).get();
+            final ud = u.data() ?? <String, dynamic>{};
+            who = (ud['name'] ?? ud['fullName'] ?? ud['studentName'] ?? '')
+                .toString()
+                .trim();
+          }
+          if (who.isEmpty) who = 'Your student';
+          final sch = (d['scholarshipTitle'] ?? 'your scholarship').toString();
+          await _firestore.collection('notifications').add({
+            'userId': sponsorId,
+            'audience': 'sponsor',
+            'type': 'thank_you',
+            'title': "Thank-you from $who 💛",
+            'body': "$who sent you a thank-you note for $sch.",
+            'note': text,
+            'studentId': studentId,
+            'applicationId': applicationId,
+            'isRead': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (_) {}
+
+      return null;
+    } on FirebaseException catch (e) {
+      return e.message ?? "Could not send. Please try again.";
+    } catch (e) {
+      return e.toString();
+    }
+  }
 }

@@ -9,8 +9,11 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/feedback_service.dart';
 
-const Color _navy = Color(0xFF1E3358);
-const Color _gold = Color(0xFFE0A93A);
+// Orange theme: same family as the "Feedback" quick-action card on the dashboard
+const Color _theme = Color(0xFFF57C00); // orange
+const Color _themeDark = Color(0xFF874400); // darker orange for gradients
+const Color _accent = Color(0xFFB45309); // burnt orange for text / icons
+const Color _gold = Color(0xFFE0A93A); // stars + NEW tag
 const Color _studentColor = Colors.indigo;
 const Color _sponsorColor = Colors.pink;
 
@@ -186,16 +189,15 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [_navy, Color(0xFF3B4F77)],
+          colors: [_themeDark, _theme],
         ),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(28),
           bottomRight: Radius.circular(28),
         ),
-        border: const Border(bottom: BorderSide(color: _gold, width: 3)),
         boxShadow: [
           BoxShadow(
-            color: _navy.withOpacity(0.3),
+            color: _theme.withOpacity(0.35),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -225,9 +227,11 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
                         child: Container(
                           width: 46,
                           height: 46,
-                          decoration: const BoxDecoration(
-                              color: _gold, shape: BoxShape.circle),
-                          child: const Icon(Icons.reviews_rounded, color: _navy),
+                          decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.18),
+                              shape: BoxShape.circle),
+                          child: const Icon(Icons.reviews_rounded,
+                              color: Colors.white),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -304,7 +308,7 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
                 builder: (context, v, _) => Text(
                   v.toStringAsFixed(1),
                   style: const TextStyle(
-                      fontSize: 40, fontWeight: FontWeight.w900, color: _navy),
+                      fontSize: 40, fontWeight: FontWeight.w900, color: _accent),
                 ),
               ),
               _MiniStars(avg.round()),
@@ -377,9 +381,10 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _theme.withOpacity(0.25)),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.05),
+          color: _theme.withOpacity(0.08),
           blurRadius: 12,
           offset: const Offset(0, 4),
         ),
@@ -390,7 +395,7 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
       onChanged: (v) => setState(() => _q = v),
       decoration: InputDecoration(
         hintText: "Search by name, comment, category or scholarship",
-        prefixIcon: const Icon(Icons.search_rounded, color: _navy),
+        prefixIcon: const Icon(Icons.search_rounded, color: _accent),
         suffixIcon: _q.isEmpty
             ? null
             : IconButton(
@@ -430,12 +435,24 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
                 padding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: _filter == it.$1 ? _navy : Colors.white,
+                  gradient: _filter == it.$1
+                      ? const LinearGradient(colors: [_themeDark, _theme])
+                      : null,
+                  color: _filter == it.$1 ? null : Colors.white,
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
                       color: _filter == it.$1
-                          ? _navy
+                          ? _theme
                           : Colors.black.withOpacity(0.08)),
+                  boxShadow: _filter == it.$1
+                      ? [
+                    BoxShadow(
+                      color: _theme.withOpacity(0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                      : [],
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -445,7 +462,7 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
-                        color: _filter == it.$1 ? Colors.white : _navy,
+                        color: _filter == it.$1 ? Colors.white : _accent,
                       ),
                     ),
                     const SizedBox(width: 7),
@@ -462,7 +479,7 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
-                            color: _filter == it.$1 ? Colors.white : _navy,
+                            color: _filter == it.$1 ? Colors.white : _accent,
                           )),
                     ),
                   ],
@@ -483,7 +500,7 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
             width: 78,
             height: 78,
             decoration: BoxDecoration(
-              color: _navy.withOpacity(0.07),
+              color: _accent.withOpacity(0.07),
               shape: BoxShape.circle,
             ),
             child: Icon(Icons.rate_review_outlined,
@@ -509,10 +526,10 @@ class _AdminFeedbackScreenState extends State<AdminFeedbackScreen> {
   BoxDecoration _cardDeco() => BoxDecoration(
     color: Colors.white,
     borderRadius: BorderRadius.circular(20),
-    border: Border.all(color: Colors.black.withOpacity(0.05)),
+    border: Border.all(color: _theme.withOpacity(0.15)),
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(0.05),
+        color: _theme.withOpacity(0.10),
         blurRadius: 14,
         offset: const Offset(0, 5),
       ),
@@ -842,7 +859,7 @@ class _FeedbackDetailState extends State<_FeedbackDetail> {
                       children: [
                         _MiniStars(f.rating, size: 26),
                         const SizedBox(width: 12),
-                        _Tag(f.category.toUpperCase(), _navy),
+                        _Tag(f.category.toUpperCase(), _accent),
                       ],
                     ),
                     if (f.contextText.isNotEmpty) ...[
@@ -879,7 +896,7 @@ class _FeedbackDetailState extends State<_FeedbackDetail> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: _navy.withOpacity(0.06),
+                          color: _accent.withOpacity(0.06),
                           borderRadius: BorderRadius.circular(12),
                           border: const Border(
                               left: BorderSide(color: _gold, width: 3)),
@@ -891,7 +908,7 @@ class _FeedbackDetailState extends State<_FeedbackDetail> {
                                 style: TextStyle(
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w800,
-                                    color: _navy)),
+                                    color: _accent)),
                             const SizedBox(height: 4),
                             Text(f.reply,
                                 style: const TextStyle(
@@ -906,7 +923,7 @@ class _FeedbackDetailState extends State<_FeedbackDetail> {
                             fontSize: 11.5,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.9,
-                            color: _gold)),
+                            color: _accent)),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _reply,
@@ -962,7 +979,7 @@ class _FeedbackDetailState extends State<_FeedbackDetail> {
                     label: Text(f.isNew ? "Mark reviewed" : "Mark as new"),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, 44),
-                      foregroundColor: _navy,
+                      foregroundColor: _accent,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
@@ -981,8 +998,8 @@ class _FeedbackDetailState extends State<_FeedbackDetail> {
                         style: TextStyle(fontWeight: FontWeight.w800)),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(0, 44),
-                      backgroundColor: _gold,
-                      foregroundColor: _navy,
+                      backgroundColor: _theme,
+                      foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),

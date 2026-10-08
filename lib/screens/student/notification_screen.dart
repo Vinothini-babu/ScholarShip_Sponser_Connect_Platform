@@ -13,9 +13,11 @@ import 'all_scholarships_screen.dart';
 import 'my_applications_screen.dart';
 import 'scholarship_applications_screen.dart';
 import '../common/feedback_screen.dart';
+import '../common/chat_screen.dart';
 import 'scholarship_info_screen.dart';
 import 'ticket_detail_screen.dart';
 import '../../utils/eligibility_utils.dart';
+import '../sponser/applications/application_details_screen.dart' as sponsor_app;
 
 // =========================================================
 // BELL (use in the student dashboard header)
@@ -3394,7 +3396,15 @@ class _InviteHighlightCardState extends State<InviteHighlightCard>
 
 class InviteBannerHost extends StatefulWidget {
   final Widget child;
-  const InviteBannerHost({super.key, required this.child});
+
+  /// true on the sponsor dashboard: only new chat messages pop up there.
+  final bool forSponsor;
+
+  const InviteBannerHost({
+    super.key,
+    required this.child,
+    this.forSponsor = false,
+  });
 
   @override
   State<InviteBannerHost> createState() => _InviteBannerHostState();
@@ -3432,14 +3442,18 @@ class _InviteBannerHostState extends State<InviteBannerHost> {
     _subUid = uid;
     if (uid == null) return;
 
-    DeadlineReminderService.runFor(uid);
+    // deadline reminders are for students only
+    if (!widget.forSponsor) DeadlineReminderService.runFor(uid);
 
     _sub = _service.streamFor(uid).listen((snap) {
       final list = snap.docs.where((d) {
         final m = d.data();
-        return m["isRead"] != true &&
-            (m["audience"] ?? "student") == "student" &&
-            !_shown.contains(d.id);
+        final audience = (m["audience"] ?? "student").toString();
+        final type = (m["type"] ?? "").toString();
+        final allowed = widget.forSponsor
+            ? (audience == "sponsor" && type == "message")
+            : audience == "student";
+        return m["isRead"] != true && allowed && !_shown.contains(d.id);
       }).toList();
 
       DateTime ts(QueryDocumentSnapshot<Map<String, dynamic>> d) {
@@ -3530,6 +3544,20 @@ class _InviteBannerHostState extends State<InviteBannerHost> {
       }
     } else if (type == "invite") {
       showInviteDialog(context, data);
+    } else if (type == "message" &&
+        (data["applicationId"] ?? "").toString().isNotEmpty) {
+      final senderRole = (data["senderRole"] ?? "").toString();
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            applicationId: data["applicationId"].toString(),
+            myRole: senderRole == "sponsor" ? "student" : "sponsor",
+            otherName: (data["senderName"] ?? "").toString(),
+            scholarshipTitle: (data["scholarshipTitle"] ?? "").toString(),
+          ),
+        ),
+      );
     } else {
       Navigator.push(
         context,
@@ -3590,6 +3618,7 @@ class _InviteBannerHostState extends State<InviteBannerHost> {
 
     final chip = const {
       "invite": "NEW INVITATION",
+      "message": "NEW MESSAGE",
       "approved": "APPROVED",
       "rejected": "APPLICATION UPDATE",
       "visit_request": "ACTION NEEDED",
@@ -3612,6 +3641,7 @@ class _InviteBannerHostState extends State<InviteBannerHost> {
 
     final icon = const {
       "invite": Icons.mail_rounded,
+      "message": Icons.chat_bubble_rounded,
       "approved": Icons.emoji_events_rounded,
       "rejected": Icons.info_rounded,
       "visit_request": Icons.event_available_rounded,
@@ -4024,6 +4054,10 @@ class _NotificationCard extends StatelessWidget {
         return (icon: Icons.person_off_rounded, color: AppColors.error);
       case "invite_reminder":
         return (icon: Icons.alarm_rounded, color: AppColors.secondary);
+      case "thank_you":
+        return (icon: Icons.favorite_rounded, color: AppColors.secondary);
+      case "message":
+        return (icon: Icons.chat_bubble_rounded, color: AppColors.secondary);
       case "feedback_reply":
         return (icon: Icons.forum_rounded, color: AppColors.secondary);
       case "ticket_reply":
@@ -4076,6 +4110,26 @@ class _NotificationCard extends StatelessWidget {
       return;
     }
 
+    // chat message -> open the conversation
+    if (type == "message") {
+      final appId = (data["applicationId"] ?? "").toString();
+      if (appId.isNotEmpty) {
+        final senderRole = (data["senderRole"] ?? "").toString();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              applicationId: appId,
+              myRole: senderRole == "sponsor" ? "student" : "sponsor",
+              otherName: (data["senderName"] ?? "").toString(),
+              scholarshipTitle: (data["scholarshipTitle"] ?? "").toString(),
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
     if (type == "ticket_reply") {
       final tid = (data["ticketId"] ?? "").toString();
       if (tid.isNotEmpty) {
@@ -4097,6 +4151,31 @@ class _NotificationCard extends StatelessWidget {
         );
       }
       return;
+    }
+
+    if (type == "thank_you") {
+      final appId = (data["applicationId"] ?? "").toString();
+      if (appId.isNotEmpty) {
+        Map<String, dynamic> appData = {};
+        try {
+          final s = await FirebaseFirestore.instance
+              .collection("applications")
+              .doc(appId)
+              .get();
+          appData = s.data() ?? {};
+        } catch (_) {}
+        if (!context.mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => sponsor_app.ApplicationDetailsScreen(
+              data: appData,
+              applicationId: appId,
+            ),
+          ),
+        );
+        return;
+      }
     }
 
     if (audience == "sponsor" && type.startsWith("invite_")) {
@@ -4154,6 +4233,9 @@ class _NotificationCard extends StatelessWidget {
     final unread = data["isRead"] != true;
     final pendingInvite = _isPendingInvite(data);
     final inviteAccepted = _inviteStatus(data) == "accepted";
+    final thankYou = (data["type"] ?? "") == "thank_you";
+    final highlight = pendingInvite || thankYou;
+    final thankNote = (data["note"] ?? "").toString().trim();
 
     return Dismissible(
       key: ValueKey(id),
@@ -4171,13 +4253,14 @@ class _NotificationCard extends StatelessWidget {
       onDismissed: (_) => service.delete(id),
       child: _PulseGlow(
         active: _isPendingInvite(data) ||
+            (thankYou && unread) ||
             (unread &&
                 ((data["type"] ?? "") == "invite_accepted" ||
                     (data["type"] ?? "") == "invite_applied")),
         child: Container(
           decoration: BoxDecoration(
-            color: pendingInvite ? null : AppColors.card,
-            gradient: pendingInvite
+            color: highlight ? null : AppColors.card,
+            gradient: highlight
                 ? const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -4186,12 +4269,12 @@ class _NotificationCard extends StatelessWidget {
                 : null,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: pendingInvite
+              color: highlight
                   ? AppColors.secondary
                   : (unread
                   ? style.color.withOpacity(0.45)
                   : Colors.transparent),
-              width: pendingInvite ? 2 : 1,
+              width: highlight ? 2 : 1,
             ),
             boxShadow: [
               BoxShadow(
@@ -4213,16 +4296,23 @@ class _NotificationCard extends StatelessWidget {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: style.color.withOpacity(0.14),
+                      color: thankYou
+                          ? style.color
+                          : style.color.withOpacity(0.14),
                       borderRadius: BorderRadius.circular(13),
                     ),
-                    child: Icon(style.icon, color: style.color),
+                    child: Icon(style.icon,
+                        color: thankYou ? AppColors.primary : style.color),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (thankYou && unread) ...[
+                          const _BlinkChip("THANK-YOU 💛"),
+                          const SizedBox(height: 8),
+                        ],
                         if (pendingInvite) ...[
                           _BlinkChip(inviteAccepted ? "ACCEPTED · APPLY NOW" : "NEW INVITATION"),
                           const SizedBox(height: 8),
@@ -4258,6 +4348,41 @@ class _NotificationCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.subtitle.copyWith(fontSize: 13),
                         ),
+                        if (thankYou && thankNote.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary.withOpacity(0.12),
+                              border: Border(
+                                left: BorderSide(
+                                    color: AppColors.secondary, width: 3),
+                              ),
+                            ),
+                            child: Text(
+                              "\u201C$thankNote\u201D",
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (thankYou) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            "Read the full note  →",
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ],
                         if (pendingInvite) ...[
                           const SizedBox(height: 8),
                           Text(

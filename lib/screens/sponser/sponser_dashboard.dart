@@ -71,350 +71,354 @@ class _SponsorDashboardState extends State<SponsorDashboard>
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser!.uid;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ==============================
-              // HEADER — gradient hero card, real-time org name/logo
-              // ==============================
-              _reveal(0, _SponsorHeader(uid: uid)),
+    // InviteBannerHost(forSponsor) -> popup banner for new student messages
+    return InviteBannerHost(
+      forSponsor: true,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ==============================
+                // HEADER — gradient hero card, real-time org name/logo
+                // ==============================
+                _reveal(0, _SponsorHeader(uid: uid)),
 
-              SizedBox(
-                width: double.infinity,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Admin verification status banner (pending / rejected only)
-                      _VerificationBanner(uid: uid),
+                SizedBox(
+                  width: double.infinity,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Admin verification status banner (pending / rejected only)
+                        _VerificationBanner(uid: uid),
 
-                      // Blinking suggestion / quote card
-                      _reveal(1, StudentSuggestionSection(sponsorId: uid)),
+                        // Blinking suggestion / quote card
+                        _reveal(1, StudentSuggestionSection(sponsorId: uid)),
 
-                      // "How was reviewing this application?" after approve / reject
-                      const FeedbackPromptCard(
-                        isSponsor: true,
-                        padding: EdgeInsets.only(top: 16),
-                      ),
-                      const SizedBox(height: 28),
+                        // "How was reviewing this application?" after approve / reject
+                        const FeedbackPromptCard(
+                          isSponsor: true,
+                          padding: EdgeInsets.only(top: 16),
+                        ),
+                        const SizedBox(height: 28),
 
-                      const _SectionTitle(title: "Quick Actions"),
-                      const SizedBox(height: 16),
+                        const _SectionTitle(title: "Quick Actions"),
+                        const SizedBox(height: 16),
 
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final isWide = constraints.maxWidth > 640;
-                          final actionsData = [
-                            (
-                            icon: Icons.add_circle_rounded,
-                            title: "Add Scholarship",
-                            subtitle: "Publish a new opportunity",
-                            gradient: [AppColors.primary, AppColors.primary.withOpacity(0.75)],
-                            onTap: () async {
-                              final snap = await FirebaseFirestore.instance
-                                  .collection("users")
-                                  .doc(uid)
-                                  .get();
-                              final v = (snap.data()?["verificationStatus"] ?? "verified")
-                                  .toString();
-                              if (!context.mounted) return;
-                              if (v != "verified") {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(v == "rejected"
-                                        ? "Your account was rejected by the admin, so you cannot add scholarships."
-                                        : "Your account is awaiting admin verification. You can add scholarships once it is verified."),
-                                  ),
-                                );
-                                return;
-                              }
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const AddScholarshipScreen()),
-                              );
-                            },
-                            ),
-                            (
-                            icon: Icons.list_alt_rounded,
-                            title: "Manage",
-                            subtitle: "Edit or remove listings",
-                            gradient: [AppColors.secondary, AppColors.secondary.withOpacity(0.75)],
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const ManageScholarshipsScreen()),
-                            ),
-                            ),
-                            (
-                            icon: Icons.assignment_rounded,
-                            title: "Applications",
-                            subtitle: "Review student submissions",
-                            gradient: [AppColors.success, AppColors.success.withOpacity(0.75)],
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => SponsorApplicationsScreen()),                            ),
-                            ),
-                            (
-                            icon: Icons.person_rounded,
-                            title: "Profile",
-                            subtitle: "Manage your organization",
-                            gradient: [AppColors.error, AppColors.error.withOpacity(0.75)],
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const SponsorProfileScreen()),
-                            ),
-                            ),
-                            (
-                            icon: Icons.lightbulb_outline_rounded,
-                            title: "Report / Suggest",
-                            subtitle: "Report an issue or share an idea",
-                            gradient: [Colors.indigo, Colors.indigo.withOpacity(0.75)],
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const FeedbackScreen(isSponsor: true)),
-                            ),
-                            ),
-                          ];
-
-                          final actions = [
-                            for (int i = 0; i < actionsData.length; i++)
-                              _reveal(
-                                1 + i,
-                                _ActionCard(
-                                  icon: actionsData[i].icon,
-                                  title: actionsData[i].title,
-                                  subtitle: actionsData[i].subtitle,
-                                  gradient: actionsData[i].gradient,
-                                  onTap: actionsData[i].onTap,
-                                ),
-                              ),
-                          ];
-
-                          // Always a 2x2 grid (2 cards on top, 2 below), and it
-                          // stretches to fill whatever width is available —
-                          // on a wide desktop window each card just gets bigger.
-                          final gap = isWide ? 20.0 : 14.0;
-                          return Column(
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(child: actions[0]),
-                                  SizedBox(width: gap),
-                                  Expanded(child: actions[1]),
-                                ],
-                              ),
-                              SizedBox(height: gap),
-                              Row(
-                                children: [
-                                  Expanded(child: actions[2]),
-                                  SizedBox(width: gap),
-                                  Expanded(child: actions[3]),
-                                ],
-                              ),
-                              SizedBox(height: gap),
-                              Row(
-                                children: [
-                                  Expanded(child: actions[4]),
-                                ],
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 32),
-                      const _SectionTitle(title: "Overview"),
-                      const SizedBox(height: 16),
-
-                      // ==============================
-                      // LIVE STATS — StreamBuilder-backed, gradient-accented, animated counters
-                      // ==============================
-                      StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection("scholarships")
-                            .where("sponsorId", isEqualTo: uid)
-                            .snapshots(),
-                        builder: (context, scholarshipSnapshot) {
-                          final totalScholarships = scholarshipSnapshot.data?.docs.length ?? 0;
-
-                          return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-                            stream: ApplicationService().getVisibleSponsorApplicationDocs(uid),
-                            builder: (context, applicationSnapshot) {
-                              final appDocs = applicationSnapshot.data ?? [];
-                              final totalApplications = appDocs.length;
-                              final approvedApplications = appDocs.where((doc) {
-                                final data = doc.data() as Map<String, dynamic>;
-                                return data["status"] == "Approved";
-                              }).length;
-                              final pendingApplications = appDocs.where((doc) {
-                                final data = doc.data() as Map<String, dynamic>;
-                                return data["status"] == "Pending";
-                              }).length;
-
-                              return LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final isWide = constraints.maxWidth > 640;
-
-                                  final statsData = [
-                                    (
-                                    icon: Icons.school_rounded,
-                                    label: "Total Scholarships",
-                                    value: totalScholarships,
-                                    accent: AppColors.primary,
-                                    badge: null as String?,
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (_) => const ManageScholarshipsScreen()),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isWide = constraints.maxWidth > 640;
+                            final actionsData = [
+                              (
+                              icon: Icons.add_circle_rounded,
+                              title: "Add Scholarship",
+                              subtitle: "Publish a new opportunity",
+                              gradient: [AppColors.primary, AppColors.primary.withOpacity(0.75)],
+                              onTap: () async {
+                                final snap = await FirebaseFirestore.instance
+                                    .collection("users")
+                                    .doc(uid)
+                                    .get();
+                                final v = (snap.data()?["verificationStatus"] ?? "verified")
+                                    .toString();
+                                if (!context.mounted) return;
+                                if (v != "verified") {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(v == "rejected"
+                                          ? "Your account was rejected by the admin, so you cannot add scholarships."
+                                          : "Your account is awaiting admin verification. You can add scholarships once it is verified."),
                                     ),
-                                    ),
-                                    (
-                                    icon: Icons.assignment_rounded,
-                                    label: "Applications Received",
-                                    value: totalApplications,
-                                    accent: AppColors.success,
-                                    badge: pendingApplications > 0 ? "$pendingApplications pending" : null,
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (_) => SponsorApplicationsScreen()),
-                                    ),
-                                    ),
-                                    (
-                                    icon: Icons.check_circle_rounded,
-                                    label: "Approved Students",
-                                    value: approvedApplications,
-                                    accent: AppColors.secondary,
-                                    badge: null as String?,
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (_) => ApprovedStudentsScreen()),
-                                    ),
-                                    ),
-                                  ];
-
-                                  final tiles = [
-                                    for (int i = 0; i < statsData.length; i++)
-                                      _reveal(
-                                        5 + i,
-                                        _StatCard(
-                                          icon: statsData[i].icon,
-                                          label: statsData[i].label,
-                                          value: statsData[i].value,
-                                          accent: statsData[i].accent,
-                                          badge: statsData[i].badge,
-                                          onTap: statsData[i].onTap,
-                                        ),
-                                      ),
-                                  ];
-
-                                  if (isWide) {
-                                    return Row(
-                                      children: tiles
-                                          .map((t) => Expanded(
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                                          child: t,
-                                        ),
-                                      ))
-                                          .toList(),
-                                    );
-                                  }
-
-                                  return Column(
-                                    children: [
-                                      for (int i = 0; i < tiles.length; i++) ...[
-                                        tiles[i],
-                                        if (i != tiles.length - 1) const SizedBox(height: 12),
-                                      ],
-                                    ],
                                   );
-                                },
-                              );
-                            },
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 32),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const _SectionTitle(title: "Recent Applications"),
-                          TextButton.icon(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => SponsorApplicationsScreen()),
-                            ),
-                            icon: const Text("See all"),
-                            label: const Icon(Icons.arrow_forward_rounded, size: 16),
-                            iconAlignment: IconAlignment.start,
-                            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // ==============================
-                      // RECENT APPLICATIONS — live feed, fills remaining space
-                      // ==============================
-                      _reveal(
-                        8,
-                        StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
-                          stream: ApplicationService().getVisibleSponsorApplicationDocs(uid),
-                          builder: (context, snapshot) {
-                            if (!snapshot.hasData) {
-                              return const _RecentApplicationsCard(child: _LoadingRow());
-                            }
-
-                            final docs = List.of(snapshot.data!).take(5).toList();
-                            // Sort client-side by submission time when present, newest first —
-                            // avoids requiring a composite Firestore index.
-                            docs.sort((a, b) {
-                              final da = a.data() as Map<String, dynamic>;
-                              final db = b.data() as Map<String, dynamic>;
-                              final ta = da["submittedAt"] ?? da["appliedAt"] ?? da["createdAt"];
-                              final tb = db["submittedAt"] ?? db["appliedAt"] ?? db["createdAt"];
-                              if (ta is Timestamp && tb is Timestamp) {
-                                return tb.compareTo(ta);
-                              }
-                              return 0;
-                            });
-
-                            if (docs.isEmpty) {
-                              return const _RecentApplicationsCard(
-                                child: _EmptyRow(
-                                  icon: Icons.inbox_rounded,
-                                  message: "No applications yet",
-                                ),
-                              );
-                            }
-
-                            return _RecentApplicationsCard(
-                              child: Column(
-                                children: [
-                                  for (int i = 0; i < docs.length; i++) ...[
-                                    _ApplicationRow(
-                                      data: docs[i].data() as Map<String, dynamic>,
-                                    ),
-                                    if (i != docs.length - 1)
-                                      Divider(height: 1, color: Colors.black.withOpacity(0.05)),
-                                  ],
-                                ],
+                                  return;
+                                }
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const AddScholarshipScreen()),
+                                );
+                              },
                               ),
+                              (
+                              icon: Icons.list_alt_rounded,
+                              title: "Manage",
+                              subtitle: "Edit or remove listings",
+                              gradient: [AppColors.secondary, AppColors.secondary.withOpacity(0.75)],
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const ManageScholarshipsScreen()),
+                              ),
+                              ),
+                              (
+                              icon: Icons.assignment_rounded,
+                              title: "Applications",
+                              subtitle: "Review student submissions",
+                              gradient: [AppColors.success, AppColors.success.withOpacity(0.75)],
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => SponsorApplicationsScreen()),                            ),
+                              ),
+                              (
+                              icon: Icons.person_rounded,
+                              title: "Profile",
+                              subtitle: "Manage your organization",
+                              gradient: [AppColors.error, AppColors.error.withOpacity(0.75)],
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const SponsorProfileScreen()),
+                              ),
+                              ),
+                              (
+                              icon: Icons.lightbulb_outline_rounded,
+                              title: "Report / Suggest",
+                              subtitle: "Report an issue or share an idea",
+                              gradient: [Colors.indigo, Colors.indigo.withOpacity(0.75)],
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => const FeedbackScreen(isSponsor: true)),
+                              ),
+                              ),
+                            ];
+
+                            final actions = [
+                              for (int i = 0; i < actionsData.length; i++)
+                                _reveal(
+                                  1 + i,
+                                  _ActionCard(
+                                    icon: actionsData[i].icon,
+                                    title: actionsData[i].title,
+                                    subtitle: actionsData[i].subtitle,
+                                    gradient: actionsData[i].gradient,
+                                    onTap: actionsData[i].onTap,
+                                  ),
+                                ),
+                            ];
+
+                            // Always a 2x2 grid (2 cards on top, 2 below), and it
+                            // stretches to fill whatever width is available —
+                            // on a wide desktop window each card just gets bigger.
+                            final gap = isWide ? 20.0 : 14.0;
+                            return Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(child: actions[0]),
+                                    SizedBox(width: gap),
+                                    Expanded(child: actions[1]),
+                                  ],
+                                ),
+                                SizedBox(height: gap),
+                                Row(
+                                  children: [
+                                    Expanded(child: actions[2]),
+                                    SizedBox(width: gap),
+                                    Expanded(child: actions[3]),
+                                  ],
+                                ),
+                                SizedBox(height: gap),
+                                Row(
+                                  children: [
+                                    Expanded(child: actions[4]),
+                                  ],
+                                ),
+                              ],
                             );
                           },
                         ),
-                      ),
-                    ],
+
+                        const SizedBox(height: 32),
+                        const _SectionTitle(title: "Overview"),
+                        const SizedBox(height: 16),
+
+                        // ==============================
+                        // LIVE STATS — StreamBuilder-backed, gradient-accented, animated counters
+                        // ==============================
+                        StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection("scholarships")
+                              .where("sponsorId", isEqualTo: uid)
+                              .snapshots(),
+                          builder: (context, scholarshipSnapshot) {
+                            final totalScholarships = scholarshipSnapshot.data?.docs.length ?? 0;
+
+                            return StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                              stream: ApplicationService().getVisibleSponsorApplicationDocs(uid),
+                              builder: (context, applicationSnapshot) {
+                                final appDocs = applicationSnapshot.data ?? [];
+                                final totalApplications = appDocs.length;
+                                final approvedApplications = appDocs.where((doc) {
+                                  final data = doc.data() as Map<String, dynamic>;
+                                  return data["status"] == "Approved";
+                                }).length;
+                                final pendingApplications = appDocs.where((doc) {
+                                  final data = doc.data() as Map<String, dynamic>;
+                                  return data["status"] == "Pending";
+                                }).length;
+
+                                return LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final isWide = constraints.maxWidth > 640;
+
+                                    final statsData = [
+                                      (
+                                      icon: Icons.school_rounded,
+                                      label: "Total Scholarships",
+                                      value: totalScholarships,
+                                      accent: AppColors.primary,
+                                      badge: null as String?,
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => const ManageScholarshipsScreen()),
+                                      ),
+                                      ),
+                                      (
+                                      icon: Icons.assignment_rounded,
+                                      label: "Applications Received",
+                                      value: totalApplications,
+                                      accent: AppColors.success,
+                                      badge: pendingApplications > 0 ? "$pendingApplications pending" : null,
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => SponsorApplicationsScreen()),
+                                      ),
+                                      ),
+                                      (
+                                      icon: Icons.check_circle_rounded,
+                                      label: "Approved Students",
+                                      value: approvedApplications,
+                                      accent: AppColors.secondary,
+                                      badge: null as String?,
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (_) => ApprovedStudentsScreen()),
+                                      ),
+                                      ),
+                                    ];
+
+                                    final tiles = [
+                                      for (int i = 0; i < statsData.length; i++)
+                                        _reveal(
+                                          5 + i,
+                                          _StatCard(
+                                            icon: statsData[i].icon,
+                                            label: statsData[i].label,
+                                            value: statsData[i].value,
+                                            accent: statsData[i].accent,
+                                            badge: statsData[i].badge,
+                                            onTap: statsData[i].onTap,
+                                          ),
+                                        ),
+                                    ];
+
+                                    if (isWide) {
+                                      return Row(
+                                        children: tiles
+                                            .map((t) => Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                                            child: t,
+                                          ),
+                                        ))
+                                            .toList(),
+                                      );
+                                    }
+
+                                    return Column(
+                                      children: [
+                                        for (int i = 0; i < tiles.length; i++) ...[
+                                          tiles[i],
+                                          if (i != tiles.length - 1) const SizedBox(height: 12),
+                                        ],
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        ),
+
+                        const SizedBox(height: 32),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const _SectionTitle(title: "Recent Applications"),
+                            TextButton.icon(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => SponsorApplicationsScreen()),
+                              ),
+                              icon: const Text("See all"),
+                              label: const Icon(Icons.arrow_forward_rounded, size: 16),
+                              iconAlignment: IconAlignment.start,
+                              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // ==============================
+                        // RECENT APPLICATIONS — live feed, fills remaining space
+                        // ==============================
+                        _reveal(
+                          8,
+                          StreamBuilder<List<QueryDocumentSnapshot<Map<String, dynamic>>>>(
+                            stream: ApplicationService().getVisibleSponsorApplicationDocs(uid),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) {
+                                return const _RecentApplicationsCard(child: _LoadingRow());
+                              }
+
+                              final docs = List.of(snapshot.data!).take(5).toList();
+                              // Sort client-side by submission time when present, newest first —
+                              // avoids requiring a composite Firestore index.
+                              docs.sort((a, b) {
+                                final da = a.data() as Map<String, dynamic>;
+                                final db = b.data() as Map<String, dynamic>;
+                                final ta = da["submittedAt"] ?? da["appliedAt"] ?? da["createdAt"];
+                                final tb = db["submittedAt"] ?? db["appliedAt"] ?? db["createdAt"];
+                                if (ta is Timestamp && tb is Timestamp) {
+                                  return tb.compareTo(ta);
+                                }
+                                return 0;
+                              });
+
+                              if (docs.isEmpty) {
+                                return const _RecentApplicationsCard(
+                                  child: _EmptyRow(
+                                    icon: Icons.inbox_rounded,
+                                    message: "No applications yet",
+                                  ),
+                                );
+                              }
+
+                              return _RecentApplicationsCard(
+                                child: Column(
+                                  children: [
+                                    for (int i = 0; i < docs.length; i++) ...[
+                                      _ApplicationRow(
+                                        data: docs[i].data() as Map<String, dynamic>,
+                                      ),
+                                      if (i != docs.length - 1)
+                                        Divider(height: 1, color: Colors.black.withOpacity(0.05)),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
