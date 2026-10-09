@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../widgets/app_logo.dart';
+import '../../widgets/animated_bubbles.dart';
 import '../auth/login_screen.dart';
 
 enum UserRole { student, sponsor, admin }
@@ -127,6 +128,17 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                       ),
                     ),
                   ],
+                ),
+              ),
+
+              // Floating bubbles (animated background effect)
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(32),
+                    bottomRight: Radius.circular(32),
+                  ),
+                  child: const AnimatedBubbles(),
                 ),
               ),
 

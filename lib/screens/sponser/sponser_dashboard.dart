@@ -899,13 +899,23 @@ class _ActionCardState extends State<_ActionCard> {
               height: 160,
               padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 14),
               decoration: BoxDecoration(
-                color: AppColors.card,
+                // Soft tint of the card's own accent colour so it stands
+                // out from the white page background
+                color: Color.alphaBlend(
+                  widget.gradient.first.withOpacity(_hovering ? 0.08 : 0.05),
+                  AppColors.card,
+                ),
                 borderRadius: radius,
-                border: Border.all(color: Colors.black.withOpacity(0.04)),
+                // Accent-coloured border — brighter on hover
+                border: Border.all(
+                  color: widget.gradient.first.withOpacity(_hovering ? 0.85 : 0.45),
+                  width: 1.5,
+                ),
+                // Accent-coloured glow instead of a plain grey shadow
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(_hovering ? 0.10 : 0.05),
-                    blurRadius: _hovering ? 20 : 10,
+                    color: widget.gradient.first.withOpacity(_hovering ? 0.28 : 0.16),
+                    blurRadius: _hovering ? 22 : 14,
                     offset: Offset(0, _hovering ? 10 : 6),
                   ),
                 ],

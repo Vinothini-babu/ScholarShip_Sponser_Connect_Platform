@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/app_logo.dart';
+import '../../widgets/animated_bubbles.dart';
 import 'terms_conditions_screen.dart';
 import 'privacy_policy_screen.dart';
 
@@ -315,6 +316,17 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ),
 
+                // Floating bubbles (animated background effect)
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(32),
+                      bottomRight: Radius.circular(32),
+                    ),
+                    child: const AnimatedBubbles(),
+                  ),
+                ),
+
                 Positioned(
                   top: -size.width * 0.15,
                   right: -size.width * 0.18,
@@ -327,6 +339,25 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ),
                 ),
+
+                // Back arrow — only shown when there is a screen to go back to
+                if (Navigator.canPop(context))
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 10,
+                    left: 12,
+                    child: IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      tooltip: "Back",
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white.withOpacity(0.15),
+                      ),
+                      icon: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
               ],
             ),
 

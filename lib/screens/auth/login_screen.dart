@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/app_logo.dart';
+import '../../widgets/animated_bubbles.dart';
 import '../student/student_dashboard.dart';
 import 'signup_screen.dart';
 import 'sponsor_signup_screen.dart';
@@ -82,10 +83,12 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.message ?? "Login Failed")),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );
@@ -110,6 +113,25 @@ class _LoginScreenState extends State<LoginScreen> {
     widget.initialRole == "sponsor" ? const SponsorSignupScreen() : const SignupScreen();
 
     Navigator.push(context, MaterialPageRoute(builder: (_) => target));
+  }
+
+  // Opens the Forgot Password dialog. Pre-fills the email if the user
+  // has already typed it in the login form.
+  Future<void> _handleForgotPassword() async {
+    final bool? sent = await showDialog<bool>(
+      context: context,
+      builder: (_) => _ForgotPasswordDialog(
+        initialEmail: emailController.text.trim(),
+      ),
+    );
+
+    if (sent == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Password reset link sent. Please check your email (and spam folder)."),
+        ),
+      );
+    }
   }
 
   InputDecoration _fieldDecoration({
@@ -201,6 +223,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
 
+                // Floating bubbles (animated background effect)
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(32),
+                      bottomRight: Radius.circular(32),
+                    ),
+                    child: const AnimatedBubbles(),
+                  ),
+                ),
+
                 // Soft decorative circle — same treatment as splash screen
                 Positioned(
                   top: -size.width * 0.15,
@@ -283,7 +316,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {},
+                        onPressed: _isLoading ? null : _handleForgotPassword,
                         child: Text(
                           "Forgot Password?",
                           style: AppTextStyles.subtitle.copyWith(
@@ -387,6 +420,158 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Forgot Password dialog
+// ─────────────────────────────────────────────────────────────
+class _ForgotPasswordDialog extends StatefulWidget {
+  final String initialEmail;
+  const _ForgotPasswordDialog({required this.initialEmail});
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  late final TextEditingController _controller;
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  bool _isSending = false;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialEmail);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendResetLink() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isSending = true;
+      _errorText = null;
+    });
+
+    try {
+      await FirebaseAuth.instance
+          .sendPasswordResetEmail(email: _controller.text.trim());
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } on FirebaseAuthException catch (e) {
+      String msg;
+      switch (e.code) {
+        case 'user-not-found':
+          msg = "No account found with this email.";
+          break;
+        case 'invalid-email':
+          msg = "Please enter a valid email address.";
+          break;
+        case 'too-many-requests':
+          msg = "Too many attempts. Please try again later.";
+          break;
+        case 'network-request-failed':
+          msg = "No internet connection.";
+          break;
+        default:
+          msg = e.message ?? "Something went wrong. Try again.";
+      }
+      if (mounted) setState(() => _errorText = msg);
+    } catch (e) {
+      if (mounted) setState(() => _errorText = e.toString());
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.card,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: Text(
+        "Forgot Password?",
+        style: AppTextStyles.heading.copyWith(
+          fontSize: 20,
+          color: AppColors.primary,
+        ),
+      ),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Enter your registered email and we'll send you a link to reset your password.",
+              style: AppTextStyles.subtitle.copyWith(fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _controller,
+              keyboardType: TextInputType.emailAddress,
+              autofocus: true,
+              validator: (value) {
+                final v = value?.trim() ?? '';
+                if (v.isEmpty) return "Enter your email";
+                if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v)) {
+                  return "Enter a valid email";
+                }
+                return null;
+              },
+              decoration: InputDecoration(
+                hintText: "Email Address",
+                prefixIcon: Icon(Icons.email_outlined,
+                    color: AppColors.textSecondary, size: 21),
+                errorText: _errorText,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.secondary, width: 1.6),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSending ? null : () => Navigator.pop(context, false),
+          child: Text("Cancel",
+              style: TextStyle(color: AppColors.textSecondary)),
+        ),
+        ElevatedButton(
+          onPressed: _isSending ? null : _sendResetLink,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: _isSending
+              ? const SizedBox(
+            height: 18,
+            width: 18,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white,
+            ),
+          )
+              : const Text("Send Link"),
+        ),
+      ],
     );
   }
 }

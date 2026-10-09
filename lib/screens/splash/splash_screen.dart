@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../widgets/app_logo.dart';
+import '../../widgets/animated_bubbles.dart';
 import '../auth/role_selection_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -126,6 +127,9 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
           ),
+
+          // Floating bubbles (animated background effect)
+          const Positioned.fill(child: AnimatedBubbles(count: 12)),
 
           // Soft decorative circle — top right, gold tint
           Positioned(
