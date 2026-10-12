@@ -99,15 +99,19 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
     // First time this application is approved, initialize semester-renewal
     // tracking so the student's "Upload Next Semester Marks" screen and
     // this screen's "Semester Updates" section both have a starting point.
-    if (status == "Approved" && currentData["currentSemester"] == null) {
+    if (status == "Approved") {
+      if (currentData["currentSemester"] == null) {
+        extra["currentSemester"] = 1;
+        extra["scholarshipStatus"] = "Active";
+      }
       // Sponsor chooses the course length (6 or 8 semesters). The scholarship
       // for each next semester is released only after the previous semester's
       // marks are approved; after the last semester it becomes "Completed".
-      final int? total = await _askTotalSemesters();
-      if (total == null) return; // sponsor cancelled
-      extra["currentSemester"] = 1;
-      extra["scholarshipStatus"] = "Active";
-      extra["totalSemesters"] = total;
+      if (currentData["totalSemesters"] is! int) {
+        final int? total = await _askTotalSemesters();
+        if (total == null) return; // sponsor cancelled
+        extra["totalSemesters"] = total;
+      }
     }
 
     final error = await ApplicationService().setStatusWithAward(
@@ -130,7 +134,8 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
     // (semester 1 Released, the rest Locked).
     if (status == "Approved" && extra["totalSemesters"] is int) {
       try {
-        await _createScholarshipReleases(extra["totalSemesters"] as int);
+        final int cur = currentData["currentSemester"] is int ? currentData["currentSemester"] as int : 1;
+        await _createScholarshipReleases(extra["totalSemesters"] as int, releasedUpTo: cur);
       } catch (_) {
         // application is already approved; releases fall back to derived status
       }
@@ -157,12 +162,12 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
     };
   }
 
-  Future<void> _createScholarshipReleases(int total) async {
+  Future<void> _createScholarshipReleases(int total, {int releasedUpTo = 1}) async {
     final batch = FirebaseFirestore.instance.batch();
     for (int n = 1; n <= total; n++) {
       batch.set(
         _appRef.collection("scholarshipReleases").doc(n.toString()),
-        _releaseData(n, n == 1),
+        _releaseData(n, n <= releasedUpTo),
         SetOptions(merge: true),
       );
     }
@@ -862,13 +867,15 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
               currentSemester: currentSemester,
               totalSemesters: total,
             ),
-            if (total == null && scholarshipStatus != "Completed")
+            if (scholarshipStatus != "Completed")
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
                   onPressed: () => _setCourseDuration(currentSemester),
                   icon: const Icon(Icons.tune_rounded, size: 18),
-                  label: const Text("Set course duration (6 / 8 semesters)"),
+                  label: Text(total == null
+                      ? "Set course duration (6 / 8 semesters)"
+                      : "Change course duration (currently $total semesters)"),
                 ),
               ),
             const SizedBox(height: 12),
