@@ -9,6 +9,9 @@ import '../../../services/application_service.dart';
 import '../../../services/notification_service.dart';
 import 'package:scholarship_sponser_connect_platform/screens/common/chat_screen.dart';
 import '../common/thank_you_sheet.dart';
+import '../../../widgets/semester_release_timeline.dart';
+import '../../../widgets/student_semester_section.dart';
+import 'package:scholarship_sponser_connect_platform/screens/student/upload_semester_update_screen.dart';
 
 class ApplicationDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -97,8 +100,14 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
     // tracking so the student's "Upload Next Semester Marks" screen and
     // this screen's "Semester Updates" section both have a starting point.
     if (status == "Approved" && currentData["currentSemester"] == null) {
+      // Sponsor chooses the course length (6 or 8 semesters). The scholarship
+      // for each next semester is released only after the previous semester's
+      // marks are approved; after the last semester it becomes "Completed".
+      final int? total = await _askTotalSemesters();
+      if (total == null) return; // sponsor cancelled
       extra["currentSemester"] = 1;
       extra["scholarshipStatus"] = "Active";
+      extra["totalSemesters"] = total;
     }
 
     final error = await ApplicationService().setStatusWithAward(
@@ -114,8 +123,189 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
     if (!mounted) return;
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+
+    // First approval: create the per-semester release records
+    // (semester 1 Released, the rest Locked).
+    if (status == "Approved" && extra["totalSemesters"] is int) {
+      try {
+        await _createScholarshipReleases(extra["totalSemesters"] as int);
+      } catch (_) {
+        // application is already approved; releases fall back to derived status
+      }
     }
   }
+
+  // ==============================
+  // SCHOLARSHIP RELEASE (Locked / Released per semester)
+  // ==============================
+
+  String get _amountLabel => (widget.data["amount"] ?? "").toString();
+
+  DocumentReference<Map<String, dynamic>> get _appRef =>
+      FirebaseFirestore.instance.collection("applications").doc(widget.applicationId);
+
+  Map<String, dynamic> _releaseData(int semester, bool released) {
+    return {
+      "semesterNumber": semester,
+      "amount": _amountLabel,
+      "status": released ? "Released" : "Locked",
+      "updatedAt": FieldValue.serverTimestamp(),
+      if (released) "releasedAt": FieldValue.serverTimestamp(),
+      if (released) "releasedBy": FirebaseAuth.instance.currentUser?.uid,
+    };
+  }
+
+  Future<void> _createScholarshipReleases(int total) async {
+    final batch = FirebaseFirestore.instance.batch();
+    for (int n = 1; n <= total; n++) {
+      batch.set(
+        _appRef.collection("scholarshipReleases").doc(n.toString()),
+        _releaseData(n, n == 1),
+        SetOptions(merge: true),
+      );
+    }
+    await batch.commit();
+  }
+
+  Future<int?> _askTotalSemesters({String confirmLabel = "Approve"}) {
+    int selected = 8;
+    return showDialog<int>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Course duration"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "How many semesters does this scholarship cover? The scholarship for each next semester is released only after the previous semester's marks are approved.",
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                children: [
+                  for (final n in const [6, 8])
+                    ChoiceChip(
+                      label: Text("$n semesters"),
+                      selected: selected == n,
+                      onSelected: (_) => setDialogState(() => selected = n),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(context, selected),
+              child: Text(confirmLabel),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// For applications approved before the course duration was captured:
+  /// sponsor sets 6 / 8 semesters and the release records are created
+  /// (semesters up to the current one Released, the rest Locked).
+  Future<void> _setCourseDuration(int currentSemester) async {
+    final total = await _askTotalSemesters(confirmLabel: "Save");
+    if (total == null) return;
+
+    final batch = FirebaseFirestore.instance.batch();
+    batch.update(_appRef, {"totalSemesters": total});
+    for (int n = 1; n <= total; n++) {
+      batch.set(
+        _appRef.collection("scholarshipReleases").doc(n.toString()),
+        _releaseData(n, n <= currentSemester),
+        SetOptions(merge: true),
+      );
+    }
+    try {
+      await batch.commit();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Could not save course duration: $e${_permissionHint()}")),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Course duration set to $total semesters.")),
+    );
+  }
+
+  /// Debug aid for permission-denied: tells whether the logged-in user is the
+  /// sponsor stored on this application (what the Firestore rules compare).
+  String _permissionHint() {
+    final me = FirebaseAuth.instance.currentUser?.uid ?? "";
+    final owner = (widget.data["sponsorId"] ?? "").toString();
+    debugPrint("PERMISSION CHECK -> me=$me application.sponsorId=$owner appId=${widget.applicationId}");
+    if (owner.isEmpty) return "\n[application has no sponsorId field]";
+    if (owner != me) return "\n[application.sponsorId=$owner but you are $me]";
+    return "\n[sponsor matches -> latest Firestore rules are not published yet]";
+  }
+
+  Future<bool> _confirm({
+    required String title,
+    required String message,
+    required String confirmLabel,
+    Color? color,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message, style: const TextStyle(fontSize: 13.5)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: color ?? AppColors.success, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  /// Sponsor re-activates a scholarship that was suspended after a rejected
+  /// semester. The student can then upload / re-upload the current semester.
+  Future<void> _reactivateScholarship() async {
+    final ok = await _confirm(
+      title: "Reactivate scholarship?",
+      message:
+      "The student will be able to submit the current semester's marks again and the scholarship continues.",
+      confirmLabel: "Reactivate",
+    );
+    if (!ok) return;
+
+    await _appRef.update({"scholarshipStatus": "Active"});
+
+    await _notifyBoth(
+      type: "semester_approved",
+      studentTitle: "Scholarship Reactivated ✅",
+      studentBody:
+      "Your scholarship for $_schTitle has been reactivated. You can submit your semester marks now.",
+      sponsorTitle: "Scholarship reactivated",
+      sponsorBody: "$_studentName · $_schTitle",
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Scholarship reactivated.")),
+    );
+  }
+
 
   Future<bool> _confirmApproveWithoutVerification() async {
     final result = await showDialog<bool>(
@@ -140,6 +330,15 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
   }
 
   // ---------------- notifications (student + sponsor) ----------------
+
+  /// True when the logged-in user is the STUDENT of this application.
+  /// Students get a read-only view + the Semester Update (upload) card;
+  /// sponsor controls (verify, approve/reject, set duration...) are hidden.
+  bool get _isStudentView {
+    final me = FirebaseAuth.instance.currentUser?.uid;
+    final studentId = (widget.data["studentId"] ?? widget.data["uid"] ?? "").toString();
+    return me != null && me == studentId;
+  }
 
   String get _schTitle =>
       (widget.data["scholarshipTitle"] ?? "the scholarship").toString();
@@ -406,31 +605,95 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
   // ==============================
 
   Future<void> _approveSemesterUpdate(int semesterNumber) async {
-    final appRef = FirebaseFirestore.instance.collection("applications").doc(widget.applicationId);
+    final appRef = _appRef;
     final semRef = appRef.collection("semesterUpdates").doc(semesterNumber.toString());
+
+    // Older applications (approved before this feature) have no totalSemesters.
+    final appSnap = await appRef.get();
+    final appData = appSnap.data() ?? <String, dynamic>{};
+    int? total = appData["totalSemesters"] is int ? appData["totalSemesters"] as int : null;
+    final bool totalWasMissing = total == null;
+    if (total == null) {
+      total = await _askTotalSemesters();
+      if (total == null) return;
+    }
+
+    final bool isLast = semesterNumber >= total;
+
+    final ok = await _confirm(
+      title: "Approve Semester $semesterNumber?",
+      message: isLast
+          ? "This is the final semester ($semesterNumber of $total). Approving it marks the scholarship as Completed."
+          : "Approving releases the scholarship for semester ${semesterNumber + 1} and unlocks the student's next upload.",
+      confirmLabel: "Approve",
+    );
+    if (!ok) return;
 
     final batch = FirebaseFirestore.instance.batch();
     batch.update(semRef, {
       "status": "Approved",
       "reviewedAt": Timestamp.now(),
     });
-    batch.update(appRef, {
-      "currentSemester": semesterNumber + 1,
-    });
-    await batch.commit();
+
+    final Map<String, dynamic> appUpdate = {};
+    if (totalWasMissing) appUpdate["totalSemesters"] = total;
+    if (isLast) {
+      appUpdate["scholarshipStatus"] = "Completed";
+      appUpdate["completedAt"] = Timestamp.now();
+    } else {
+      appUpdate["currentSemester"] = semesterNumber + 1;
+    }
+    batch.update(appRef, appUpdate);
+
+    if (!isLast) {
+      // next semester's scholarship becomes Released
+      batch.set(
+        appRef.collection("scholarshipReleases").doc((semesterNumber + 1).toString()),
+        _releaseData(semesterNumber + 1, true),
+        SetOptions(merge: true),
+      );
+      // legacy application: create the remaining semesters as Locked
+      if (totalWasMissing) {
+        for (int n = semesterNumber + 2; n <= total; n++) {
+          batch.set(
+            appRef.collection("scholarshipReleases").doc(n.toString()),
+            _releaseData(n, false),
+            SetOptions(merge: true),
+          );
+        }
+      }
+    }
+    try {
+      await batch.commit();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Could not approve semester: $e${_permissionHint()}")),
+      );
+      return;
+    }
 
     await _notifyBoth(
       type: "semester_approved",
-      studentTitle: "Semester $semesterNumber Approved ✅",
-      studentBody:
-      "Your semester $semesterNumber update for $_schTitle was approved. You can submit semester ${semesterNumber + 1} now.",
-      sponsorTitle: "Semester $semesterNumber approved",
+      studentTitle: isLast
+          ? "Scholarship Completed 🎓"
+          : "Semester $semesterNumber Approved ✅",
+      studentBody: isLast
+          ? "Your semester $semesterNumber update for $_schTitle was approved. All $total semesters are completed — congratulations!"
+          : "Your semester $semesterNumber update for $_schTitle was approved. The scholarship for semester ${semesterNumber + 1} is released and you can submit semester ${semesterNumber + 1} now.",
+      sponsorTitle: isLast
+          ? "Scholarship completed"
+          : "Semester $semesterNumber approved",
       sponsorBody: "$_studentName · $_schTitle",
     );
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Semester $semesterNumber approved — student can now submit semester ${semesterNumber + 1}.")),
+      SnackBar(
+        content: Text(isLast
+            ? "Semester $semesterNumber approved — scholarship completed."
+            : "Semester $semesterNumber approved — scholarship for semester ${semesterNumber + 1} released."),
+      ),
     );
   }
 
@@ -514,12 +777,114 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
     );
   }
 
+  // Release timeline + Suspended (Reactivate) / Completed banners
+  Widget _buildScholarshipProgress() {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _appRef.snapshots(),
+      builder: (context, snap) {
+        final d = snap.data?.data();
+        if (d == null) return const SizedBox.shrink();
+
+        final String scholarshipStatus = (d["scholarshipStatus"] ?? "Active").toString();
+        final int currentSemester = d["currentSemester"] is int ? d["currentSemester"] as int : 1;
+        final int? total = d["totalSemesters"] is int ? d["totalSemesters"] as int : null;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (scholarshipStatus == "Suspended") ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.warning.withOpacity(0.35)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.pause_circle_outline_rounded, color: AppColors.warning),
+                        const SizedBox(width: 8),
+                        Text("Scholarship Suspended",
+                            style: TextStyle(color: AppColors.warning, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      "The student cannot submit semester marks while the scholarship is suspended.",
+                      style: TextStyle(fontSize: 12.5),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: _reactivateScholarship,
+                      icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
+                      label: const Text("Reactivate Scholarship"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (scholarshipStatus == "Completed") ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.success.withOpacity(0.35)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.verified_rounded, color: AppColors.success),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Scholarship Completed${total != null ? " — all $total semesters done" : ""}",
+                        style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            SemesterReleaseTimeline(
+              applicationId: widget.applicationId,
+              currentSemester: currentSemester,
+              totalSemesters: total,
+            ),
+            if (total == null && scholarshipStatus != "Completed")
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _setCourseDuration(currentSemester),
+                  icon: const Icon(Icons.tune_rounded, size: 18),
+                  label: const Text("Set course duration (6 / 8 semesters)"),
+                ),
+              ),
+            const SizedBox(height: 12),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildSemesterUpdatesSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeader(icon: Icons.history_edu_rounded, title: "Semester Updates"),
         const SizedBox(height: 12),
+        _buildScholarshipProgress(),
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection("applications")
@@ -794,89 +1159,127 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
                         ],
                       )),
 
-                      const SizedBox(height: 22),
-                      _SectionHeader(icon: Icons.verified_user_outlined, title: "Document Verification"),
-                      const SizedBox(height: 12),
+                      if (!_isStudentView) ...[
+                        const SizedBox(height: 22),
+                        _SectionHeader(icon: Icons.verified_user_outlined, title: "Document Verification"),
+                        const SizedBox(height: 12),
 
-                      _reveal(6, _Card(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              value: documentsVerified,
-                              onChanged: (value) => _toggleDocumentsVerified(value, data),
-                              activeColor: AppColors.success,
-                              title: const Text("Documents Verified", style: TextStyle(fontWeight: FontWeight.w600)),
-                              subtitle: const Text(
-                                "You've reviewed the uploaded documents online and they look genuine.",
-                                style: TextStyle(fontSize: 12.5),
+                        _reveal(6, _Card(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                value: documentsVerified,
+                                onChanged: (value) => _toggleDocumentsVerified(value, data),
+                                activeColor: AppColors.success,
+                                title: const Text("Documents Verified", style: TextStyle(fontWeight: FontWeight.w600)),
+                                subtitle: const Text(
+                                  "You've reviewed the uploaded documents online and they look genuine.",
+                                  style: TextStyle(fontSize: 12.5),
+                                ),
                               ),
-                            ),
-                            Divider(color: AppColors.textSecondary.withOpacity(0.12)),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  fieldVerified ? Icons.verified_rounded : Icons.pending_outlined,
-                                  color: fieldVerified ? AppColors.success : AppColors.textSecondary,
-                                  size: 22,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        fieldVerified ? "Field Verified" : "Not field-verified yet",
-                                        style: const TextStyle(fontWeight: FontWeight.w600),
-                                      ),
-                                      if (fieldVerified) ...[
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          "By ${data["fieldVerifiedBy"] ?? "—"}"
-                                              "${(data["fieldVerifiedNote"] ?? "").toString().isNotEmpty ? " · ${data["fieldVerifiedNote"]}" : ""}",
-                                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                                        ),
-                                      ],
-                                    ],
+                              Divider(color: AppColors.textSecondary.withOpacity(0.12)),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(
+                                    fieldVerified ? Icons.verified_rounded : Icons.pending_outlined,
+                                    color: fieldVerified ? AppColors.success : AppColors.textSecondary,
+                                    size: 22,
                                   ),
-                                ),
-                                TextButton(
-                                  onPressed: () => _openFieldVerificationDialog(fieldVerified),
-                                  child: Text(fieldVerified ? "Update" : "Mark Verified"),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          fieldVerified ? "Field Verified" : "Not field-verified yet",
+                                          style: const TextStyle(fontWeight: FontWeight.w600),
+                                        ),
+                                        if (fieldVerified) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            "By ${data["fieldVerifiedBy"] ?? "—"}"
+                                                "${(data["fieldVerifiedNote"] ?? "").toString().isNotEmpty ? " · ${data["fieldVerifiedNote"]}" : ""}",
+                                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => _openFieldVerificationDialog(fieldVerified),
+                                    child: Text(fieldVerified ? "Update" : "Mark Verified"),
+                                  ),
+                                ],
+                              ),
+                              if (data["verificationVisit"] is Map) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Visit scheduled: "
+                                      "${(data["verificationVisit"]["scheduledFor"] is Timestamp) ? _fmtDateTime((data["verificationVisit"]["scheduledFor"] as Timestamp).toDate()) : "—"}"
+                                      " · ${data["verificationVisit"]["venue"] ?? ""}",
+                                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                                 ),
                               ],
-                            ),
-                            if (data["verificationVisit"] is Map) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                "Visit scheduled: "
-                                    "${(data["verificationVisit"]["scheduledFor"] is Timestamp) ? _fmtDateTime((data["verificationVisit"]["scheduledFor"] as Timestamp).toDate()) : "—"}"
-                                    " · ${data["verificationVisit"]["venue"] ?? ""}",
-                                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: _scheduleVerificationVisit,
+                                  icon: const Icon(Icons.event_available_rounded, size: 18),
+                                  label: Text(data["verificationVisit"] is Map
+                                      ? "Reschedule verification visit"
+                                      : "Schedule verification visit"),
+                                ),
                               ),
                             ],
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed: _scheduleVerificationVisit,
-                                icon: const Icon(Icons.event_available_rounded, size: 18),
-                                label: Text(data["verificationVisit"] is Map
-                                    ? "Reschedule verification visit"
-                                    : "Schedule verification visit"),
+                          ),
+                        )),
+                      ] else ...[
+                        const SizedBox(height: 22),
+                        _SectionHeader(icon: Icons.verified_user_outlined, title: "Document Verification"),
+                        const SizedBox(height: 12),
+                        _Card(
+                          child: Row(
+                            children: [
+                              Icon(
+                                data["documentsVerified"] == true
+                                    ? Icons.verified_rounded
+                                    : Icons.hourglass_top_rounded,
+                                color: data["documentsVerified"] == true ? AppColors.success : AppColors.warning,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  data["documentsVerified"] == true
+                                      ? "Your documents have been verified by the sponsor."
+                                      : "Your documents are waiting for the sponsor's verification.",
+                                  style: AppTextStyles.subtitle.copyWith(fontSize: 13, color: AppColors.textPrimary),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      )),
+                      ],
 
                       // NEW — Semester Updates: only relevant once the application
                       // itself has been approved (semester renewal doesn't apply
                       // before that), so it's gated on status == "Approved".
                       if (status == "Approved") ...[
                         const SizedBox(height: 22),
-                        _buildSemesterUpdatesSection(),
+                        if (_isStudentView)
+                          StudentSemesterSection(
+                            applicationId: widget.applicationId,
+                            onUpload: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => UploadSemesterUpdateScreen(applicationId: widget.applicationId),
+                              ),
+                            ),
+                          )
+                        else
+                          _buildSemesterUpdatesSection(),
                       ],
 
                       const SizedBox(height: 22),
@@ -961,68 +1364,72 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
                       const SizedBox(height: 16),
                       ChatEntryButton(
                         applicationId: widget.applicationId,
-                        myRole: "sponsor",
-                        otherName: (data["studentName"] ?? "Student").toString(),
+                        myRole: _isStudentView ? "student" : "sponsor",
+                        otherName: _isStudentView
+                            ? (data["sponsorName"] ?? data["organizationName"] ?? "Sponsor").toString()
+                            : (data["studentName"] ?? "Student").toString(),
                         scholarshipTitle: (data["scholarshipTitle"] ?? "Scholarship").toString(),
                       ),
 
-                      const SizedBox(height: 24),
+                      if (!_isStudentView) ...[
+                        const SizedBox(height: 24),
 
-                      _reveal(9, Row(
-                        children: [
-                          Expanded(
-                            child: SizedBox(
-                              height: 50,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  gradient: LinearGradient(
-                                    colors: status == "Approved"
-                                        ? [AppColors.success.withOpacity(0.4), AppColors.success.withOpacity(0.4)]
-                                        : [AppColors.success, AppColors.success.withOpacity(0.82)],
-                                  ),
-                                  boxShadow: status == "Approved"
-                                      ? []
-                                      : [
-                                    BoxShadow(
-                                      color: AppColors.success.withOpacity(0.30),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 6),
+                        _reveal(9, Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 50,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    gradient: LinearGradient(
+                                      colors: status == "Approved"
+                                          ? [AppColors.success.withOpacity(0.4), AppColors.success.withOpacity(0.4)]
+                                          : [AppColors.success, AppColors.success.withOpacity(0.82)],
                                     ),
-                                  ],
+                                    boxShadow: status == "Approved"
+                                        ? []
+                                        : [
+                                      BoxShadow(
+                                        color: AppColors.success.withOpacity(0.30),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ElevatedButton.icon(
+                                    onPressed: status == "Approved" ? null : () => updateStatus("Approved", data),
+                                    icon: const Icon(Icons.check_rounded, size: 18),
+                                    label: const Text("Approve"),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.transparent,
+                                      shadowColor: Colors.transparent,
+                                      foregroundColor: Colors.white,
+                                      disabledForegroundColor: Colors.white.withOpacity(0.85),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
                                 ),
-                                child: ElevatedButton.icon(
-                                  onPressed: status == "Approved" ? null : () => updateStatus("Approved", data),
-                                  icon: const Icon(Icons.check_rounded, size: 18),
-                                  label: const Text("Approve"),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    shadowColor: Colors.transparent,
-                                    foregroundColor: Colors.white,
-                                    disabledForegroundColor: Colors.white.withOpacity(0.85),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: SizedBox(
+                                height: 50,
+                                child: OutlinedButton.icon(
+                                  onPressed: status == "Rejected" ? null : () => updateStatus("Rejected", data),
+                                  icon: Icon(Icons.close_rounded, size: 18, color: AppColors.error),
+                                  label: Text("Reject", style: TextStyle(color: AppColors.error)),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: AppColors.error, width: 1.4),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: SizedBox(
-                              height: 50,
-                              child: OutlinedButton.icon(
-                                onPressed: status == "Rejected" ? null : () => updateStatus("Rejected", data),
-                                icon: Icon(Icons.close_rounded, size: 18, color: AppColors.error),
-                                label: Text("Reject", style: TextStyle(color: AppColors.error)),
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: AppColors.error, width: 1.4),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      )),
+                          ],
+                        )),
+                      ],
 
                       const SizedBox(height: 30),
                     ],

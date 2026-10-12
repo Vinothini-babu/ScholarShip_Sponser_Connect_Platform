@@ -44,6 +44,20 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleSignIn() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Grab these BEFORE any await. After an await (or after logout /
+    // auth-state rebuilds) this screen's context can be deactivated and
+    // ScaffoldMessenger.of(context) / Navigator.of(context) would throw.
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
+    void toast(String msg) {
+      try {
+        messenger.showSnackBar(SnackBar(content: Text(msg)));
+      } catch (_) {
+        // never let a snackbar failure break the login flow
+      }
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -52,46 +66,30 @@ class _LoginScreenState extends State<LoginScreen> {
         password: passwordController.text.trim(),
       );
 
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Login Successful")),
-      );
-
-      String role = await _authService.getUserRole();
+      final String role = await _authService.getUserRole();
 
       if (!mounted) return;
 
+      Widget? target;
       if (role == "student") {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const StudentDashboard()),
-        );
+        target = const StudentDashboard();
       } else if (role == "sponsor") {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const SponsorDashboard()),
-        );
+        target = const SponsorDashboard();
       } else if (role == "admin") {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Invalid user role")),
-        );
+        target = const AdminDashboardScreen();
       }
+
+      if (target == null) {
+        toast("Invalid user role");
+        return;
+      }
+
+      toast("Login Successful");
+      navigator.pushReplacement(MaterialPageRoute(builder: (_) => target!));
     } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message ?? "Login Failed")),
-      );
+      toast(e.message ?? "Login Failed");
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      toast(e.toString());
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

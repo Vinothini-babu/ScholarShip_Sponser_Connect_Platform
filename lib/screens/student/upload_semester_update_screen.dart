@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../services/storage_service.dart';
+import '../../widgets/semester_release_timeline.dart';
 
 /// Lets a student, after completing a semester, upload that semester's
 /// marksheet + marks percentage so the sponsor can review it and continue
@@ -237,6 +238,8 @@ class _UploadSemesterUpdateScreenState extends State<UploadSemesterUpdateScreen>
           final appData = (appSnap.data!.data() as Map<String, dynamic>?) ?? {};
           final int currentSemester = (appData["currentSemester"] is int) ? appData["currentSemester"] : 1;
           final String scholarshipStatus = appData["scholarshipStatus"] ?? "Active";
+          final int? totalSemesters =
+          (appData["totalSemesters"] is int) ? appData["totalSemesters"] as int : null;
 
           if (scholarshipStatus == "Suspended") {
             return _StatusMessage(
@@ -247,11 +250,27 @@ class _UploadSemesterUpdateScreenState extends State<UploadSemesterUpdateScreen>
             );
           }
           if (scholarshipStatus == "Completed") {
-            return _StatusMessage(
-              icon: Icons.check_circle_outline_rounded,
-              color: AppColors.success,
-              title: "Scholarship Completed",
-              message: "There are no further semester updates required.",
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _StatusMessage(
+                    icon: Icons.check_circle_outline_rounded,
+                    color: AppColors.success,
+                    title: "Scholarship Completed",
+                    message: totalSemesters != null
+                        ? "All $totalSemesters semesters are completed. There are no further semester updates required."
+                        : "There are no further semester updates required.",
+                  ),
+                  const SizedBox(height: 16),
+                  SemesterReleaseTimeline(
+                    applicationId: widget.applicationId,
+                    currentSemester: currentSemester,
+                    totalSemesters: totalSemesters,
+                  ),
+                ],
+              ),
             );
           }
 
@@ -274,6 +293,12 @@ class _UploadSemesterUpdateScreenState extends State<UploadSemesterUpdateScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    SemesterReleaseTimeline(
+                      applicationId: widget.applicationId,
+                      currentSemester: currentSemester,
+                      totalSemesters: totalSemesters,
+                    ),
+                    const SizedBox(height: 20),
                     if (history.isNotEmpty) ...[
                       Text("Semester History", style: AppTextStyles.title.copyWith(fontSize: 17)),
                       const SizedBox(height: 12),
@@ -288,7 +313,7 @@ class _UploadSemesterUpdateScreenState extends State<UploadSemesterUpdateScreen>
                         message: "Your semester $currentSemester marks are submitted and awaiting sponsor review.",
                       )
                     else
-                      _buildForm(context, currentSemester),
+                      _buildForm(context, currentSemester, totalSemesters),
                   ],
                 ),
               );
@@ -299,13 +324,18 @@ class _UploadSemesterUpdateScreenState extends State<UploadSemesterUpdateScreen>
     );
   }
 
-  Widget _buildForm(BuildContext context, int semesterNumber) {
+  Widget _buildForm(BuildContext context, int semesterNumber, int? totalSemesters) {
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Upload Semester $semesterNumber Marks", style: AppTextStyles.title.copyWith(fontSize: 18)),
+          Text(
+            totalSemesters == null
+                ? "Upload Semester $semesterNumber Marks"
+                : "Upload Semester $semesterNumber of $totalSemesters Marks",
+            style: AppTextStyles.title.copyWith(fontSize: 18),
+          ),
           const SizedBox(height: 6),
           Text(
             "Completed semester $semesterNumber? Upload your marksheet and marks percentage to continue your scholarship.",

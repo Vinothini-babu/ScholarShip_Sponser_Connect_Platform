@@ -8,6 +8,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../services/application_service.dart';
 import '../../../services/notification_service.dart';
 import '../../common/thank_you_sheet.dart';
+import '../../../widgets/semester_release_timeline.dart';
 
 class ApplicationDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -96,8 +97,14 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
     // tracking so the student's "Upload Next Semester Marks" screen and
     // this screen's "Semester Updates" section both have a starting point.
     if (status == "Approved" && currentData["currentSemester"] == null) {
+      // Sponsor chooses the course length (6 or 8 semesters). The scholarship
+      // for each next semester is released only after the previous semester's
+      // marks are approved; after the last semester it becomes "Completed".
+      final int? total = await _askTotalSemesters();
+      if (total == null) return; // sponsor cancelled
       extra["currentSemester"] = 1;
       extra["scholarshipStatus"] = "Active";
+      extra["totalSemesters"] = total;
     }
 
     final error = await ApplicationService().setStatusWithAward(
@@ -113,7 +120,144 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
     if (!mounted) return;
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      return;
     }
+
+    // First approval: create the per-semester release records
+    // (semester 1 Released, the rest Locked).
+    if (status == "Approved" && extra["totalSemesters"] is int) {
+      try {
+        await _createScholarshipReleases(extra["totalSemesters"] as int);
+      } catch (_) {
+        // application is already approved; releases fall back to derived status
+      }
+    }
+  }
+
+  // ==============================
+  // SCHOLARSHIP RELEASE (Locked / Released per semester)
+  // ==============================
+
+  String get _amountLabel => (widget.data["amount"] ?? "").toString();
+
+  DocumentReference<Map<String, dynamic>> get _appRef =>
+      FirebaseFirestore.instance.collection("applications").doc(widget.applicationId);
+
+  Map<String, dynamic> _releaseData(int semester, bool released) {
+    return {
+      "semesterNumber": semester,
+      "amount": _amountLabel,
+      "status": released ? "Released" : "Locked",
+      "updatedAt": FieldValue.serverTimestamp(),
+      if (released) "releasedAt": FieldValue.serverTimestamp(),
+      if (released) "releasedBy": FirebaseAuth.instance.currentUser?.uid,
+    };
+  }
+
+  Future<void> _createScholarshipReleases(int total) async {
+    final batch = FirebaseFirestore.instance.batch();
+    for (int n = 1; n <= total; n++) {
+      batch.set(
+        _appRef.collection("scholarshipReleases").doc(n.toString()),
+        _releaseData(n, n == 1),
+        SetOptions(merge: true),
+      );
+    }
+    await batch.commit();
+  }
+
+  Future<int?> _askTotalSemesters() {
+    int selected = 8;
+    return showDialog<int>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Course duration"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "How many semesters does this scholarship cover? The scholarship for each next semester is released only after the previous semester's marks are approved.",
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                children: [
+                  for (final n in const [6, 8])
+                    ChoiceChip(
+                      label: Text("$n semesters"),
+                      selected: selected == n,
+                      onSelected: (_) => setDialogState(() => selected = n),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(context, selected),
+              child: const Text("Approve"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirm({
+    required String title,
+    required String message,
+    required String confirmLabel,
+    Color? color,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message, style: const TextStyle(fontSize: 13.5)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: color ?? AppColors.success, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  /// Sponsor re-activates a scholarship that was suspended after a rejected
+  /// semester. The student can then upload / re-upload the current semester.
+  Future<void> _reactivateScholarship() async {
+    final ok = await _confirm(
+      title: "Reactivate scholarship?",
+      message:
+      "The student will be able to submit the current semester's marks again and the scholarship continues.",
+      confirmLabel: "Reactivate",
+    );
+    if (!ok) return;
+
+    await _appRef.update({"scholarshipStatus": "Active"});
+
+    await _notifyBoth(
+      type: "semester_approved",
+      studentTitle: "Scholarship Reactivated ✅",
+      studentBody:
+      "Your scholarship for $_schTitle has been reactivated. You can submit your semester marks now.",
+      sponsorTitle: "Scholarship reactivated",
+      sponsorBody: "$_studentName · $_schTitle",
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Scholarship reactivated.")),
+    );
   }
 
   Future<bool> _confirmApproveWithoutVerification() async {
@@ -405,31 +549,87 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
   // ==============================
 
   Future<void> _approveSemesterUpdate(int semesterNumber) async {
-    final appRef = FirebaseFirestore.instance.collection("applications").doc(widget.applicationId);
+    final appRef = _appRef;
     final semRef = appRef.collection("semesterUpdates").doc(semesterNumber.toString());
+
+    // Older applications (approved before this feature) have no totalSemesters.
+    final appSnap = await appRef.get();
+    final appData = appSnap.data() ?? <String, dynamic>{};
+    int? total = appData["totalSemesters"] is int ? appData["totalSemesters"] as int : null;
+    final bool totalWasMissing = total == null;
+    if (total == null) {
+      total = await _askTotalSemesters();
+      if (total == null) return;
+    }
+
+    final bool isLast = semesterNumber >= total;
+
+    final ok = await _confirm(
+      title: "Approve Semester $semesterNumber?",
+      message: isLast
+          ? "This is the final semester ($semesterNumber of $total). Approving it marks the scholarship as Completed."
+          : "Approving releases the scholarship for semester ${semesterNumber + 1} and unlocks the student's next upload.",
+      confirmLabel: "Approve",
+    );
+    if (!ok) return;
 
     final batch = FirebaseFirestore.instance.batch();
     batch.update(semRef, {
       "status": "Approved",
       "reviewedAt": Timestamp.now(),
     });
-    batch.update(appRef, {
-      "currentSemester": semesterNumber + 1,
-    });
+
+    final Map<String, dynamic> appUpdate = {};
+    if (totalWasMissing) appUpdate["totalSemesters"] = total;
+    if (isLast) {
+      appUpdate["scholarshipStatus"] = "Completed";
+      appUpdate["completedAt"] = Timestamp.now();
+    } else {
+      appUpdate["currentSemester"] = semesterNumber + 1;
+    }
+    batch.update(appRef, appUpdate);
+
+    if (!isLast) {
+      // next semester's scholarship becomes Released
+      batch.set(
+        appRef.collection("scholarshipReleases").doc((semesterNumber + 1).toString()),
+        _releaseData(semesterNumber + 1, true),
+        SetOptions(merge: true),
+      );
+      // legacy application: create the remaining semesters as Locked
+      if (totalWasMissing) {
+        for (int n = semesterNumber + 2; n <= total; n++) {
+          batch.set(
+            appRef.collection("scholarshipReleases").doc(n.toString()),
+            _releaseData(n, false),
+            SetOptions(merge: true),
+          );
+        }
+      }
+    }
     await batch.commit();
 
     await _notifyBoth(
       type: "semester_approved",
-      studentTitle: "Semester $semesterNumber Approved ✅",
-      studentBody:
-      "Your semester $semesterNumber update for $_schTitle was approved. You can submit semester ${semesterNumber + 1} now.",
-      sponsorTitle: "Semester $semesterNumber approved",
+      studentTitle: isLast
+          ? "Scholarship Completed 🎓"
+          : "Semester $semesterNumber Approved ✅",
+      studentBody: isLast
+          ? "Your semester $semesterNumber update for $_schTitle was approved. All $total semesters are completed — congratulations!"
+          : "Your semester $semesterNumber update for $_schTitle was approved. The scholarship for semester ${semesterNumber + 1} is released and you can submit semester ${semesterNumber + 1} now.",
+      sponsorTitle: isLast
+          ? "Scholarship completed"
+          : "Semester $semesterNumber approved",
       sponsorBody: "$_studentName · $_schTitle",
     );
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Semester $semesterNumber approved — student can now submit semester ${semesterNumber + 1}.")),
+      SnackBar(
+        content: Text(isLast
+            ? "Semester $semesterNumber approved — scholarship completed."
+            : "Semester $semesterNumber approved — scholarship for semester ${semesterNumber + 1} released."),
+      ),
     );
   }
 
@@ -513,12 +713,105 @@ class _ApplicationDetailsScreenState extends State<ApplicationDetailsScreen>
     );
   }
 
+  // Release timeline + Suspended (Reactivate) / Completed banners
+  Widget _buildScholarshipProgress() {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _appRef.snapshots(),
+      builder: (context, snap) {
+        final d = snap.data?.data();
+        if (d == null) return const SizedBox.shrink();
+
+        final String scholarshipStatus = (d["scholarshipStatus"] ?? "Active").toString();
+        final int currentSemester = d["currentSemester"] is int ? d["currentSemester"] as int : 1;
+        final int? total = d["totalSemesters"] is int ? d["totalSemesters"] as int : null;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (scholarshipStatus == "Suspended") ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.warning.withOpacity(0.35)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.pause_circle_outline_rounded, color: AppColors.warning),
+                        const SizedBox(width: 8),
+                        Text("Scholarship Suspended",
+                            style: TextStyle(color: AppColors.warning, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      "The student cannot submit semester marks while the scholarship is suspended.",
+                      style: TextStyle(fontSize: 12.5),
+                    ),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      onPressed: _reactivateScholarship,
+                      icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
+                      label: const Text("Reactivate Scholarship"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (scholarshipStatus == "Completed") ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.success.withOpacity(0.35)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.verified_rounded, color: AppColors.success),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Scholarship Completed${total != null ? " — all $total semesters done" : ""}",
+                        style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            SemesterReleaseTimeline(
+              applicationId: widget.applicationId,
+              currentSemester: currentSemester,
+              totalSemesters: total,
+            ),
+            const SizedBox(height: 12),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildSemesterUpdatesSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionHeader(icon: Icons.history_edu_rounded, title: "Semester Updates"),
         const SizedBox(height: 12),
+        _buildScholarshipProgress(),
         StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection("applications")

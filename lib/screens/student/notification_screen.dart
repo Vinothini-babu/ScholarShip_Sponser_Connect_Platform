@@ -32,10 +32,19 @@ class NotificationBell extends StatefulWidget {
 
 class _NotificationBellState extends State<NotificationBell>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1800),
-  )..repeat();
+  late final AnimationController _c;
+
+  // Created in initState (NOT lazily): a lazy `late final` initializer that
+  // is first touched inside dispose() would create a ticker on an already
+  // deactivated element and throw during logout / navigation teardown.
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat();
+  }
 
   @override
   void dispose() {
@@ -2058,10 +2067,19 @@ class _BlinkChip extends StatefulWidget {
 
 class _BlinkChipState extends State<_BlinkChip>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 850),
-  )..repeat(reverse: true);
+  late final AnimationController _c;
+
+  // Created in initState (NOT lazily): a lazy `late final` initializer that
+  // is first touched inside dispose() would create a ticker on an already
+  // deactivated element and throw during logout / navigation teardown.
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    )..repeat(reverse: true);
+  }
 
   @override
   void dispose() {
@@ -2160,10 +2178,19 @@ class _LiveDot extends StatefulWidget {
 
 class _LiveDotState extends State<_LiveDot>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..repeat(reverse: true);
+  late final AnimationController _c;
+
+  // Created in initState (NOT lazily): a lazy `late final` initializer that
+  // is first touched inside dispose() would create a ticker on an already
+  // deactivated element and throw during logout / navigation teardown.
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
 
   @override
   void dispose() {
@@ -2219,10 +2246,19 @@ class _PulseGlow extends StatefulWidget {
 
 class _PulseGlowState extends State<_PulseGlow>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1300),
-  )..repeat(reverse: true);
+  late final AnimationController _c;
+
+  // Created in initState (NOT lazily): a lazy `late final` initializer that
+  // is first touched inside dispose() would create a ticker on an already
+  // deactivated element and throw during logout / navigation teardown.
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1300),
+    )..repeat(reverse: true);
+  }
 
   @override
   void dispose() {
@@ -3156,10 +3192,19 @@ class InviteHighlightCard extends StatefulWidget {
 
 class _InviteHighlightCardState extends State<InviteHighlightCard>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1200),
-  )..repeat(reverse: true);
+  late final AnimationController _c;
+
+  // Created in initState (NOT lazily): a lazy `late final` initializer that
+  // is first touched inside dispose() would create a ticker on an already
+  // deactivated element and throw during logout / navigation teardown.
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+  }
 
   @override
   void dispose() {
