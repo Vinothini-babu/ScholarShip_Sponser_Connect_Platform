@@ -34,7 +34,7 @@ class _AdminSupportTicketsScreenState extends State<AdminSupportTicketsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Support Tickets')),
+      appBar: AppBar(title: const Text('Support Team')),
       body: StreamBuilder<List<TicketModel>>(
         stream: _service.streamTickets(),
         builder: (context, snap) {

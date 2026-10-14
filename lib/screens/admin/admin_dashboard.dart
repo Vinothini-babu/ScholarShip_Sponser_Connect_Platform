@@ -710,7 +710,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           final n = snap.data?.docs.length ?? 0;
           return _QuickActionCard(
             icon: Icons.support_agent_rounded,
-            title: "Support Tickets",
+            title: "Support Team",
             subtitle: n > 0 ? "$n open tickets" : "Student queries & replies",
             color: Colors.deepPurple,
             highlighted: n > 0,
