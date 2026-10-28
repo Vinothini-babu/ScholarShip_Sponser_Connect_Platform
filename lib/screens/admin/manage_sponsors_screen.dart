@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -165,6 +166,16 @@ class _ManageSponsorsScreenState extends State<ManageSponsorsScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
                   children: [
                     _searchBox(),
+                    const SizedBox(height: 14),
+                    // TEMP: one-time fix for old local proof paths. Delete after use.
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _fixProofPaths(context),
+                        icon: const Icon(Icons.build_rounded, size: 18),
+                        label: const Text("Fix proof paths (temp)"),
+                      ),
+                    ),
                     const SizedBox(height: 14),
                     Wrap(
                       spacing: 8,
@@ -835,6 +846,75 @@ class _ManageSponsorsScreenState extends State<ManageSponsorsScreen> {
         SnackBar(content: Text("Could not open the document ($e)")),
       );
     }
+  }
+
+  /// TEMP one-time helper: points every sponsor's proofDocumentUrl to the
+  /// matching PDF in D:/Mini_Project (matched by organisation name).
+  /// Cloudinary (http) links are left untouched. Delete after use.
+  Future<void> _fixProofPaths(BuildContext context) async {
+    String msg;
+    try {
+      const folder = r'D:\Mini_Project';
+      final pdfs = Directory(folder)
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.toLowerCase().endsWith('.pdf'))
+          .toList();
+
+      String norm(String s) =>
+          s.trim().replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_').toLowerCase();
+
+      final snap = await FirebaseFirestore.instance
+          .collection("users")
+          .where("role", isEqualTo: "sponsor")
+          .get();
+
+      int updated = 0;
+      final missing = <String>[];
+
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final org = _orgName(data);
+        final current = (data["proofDocumentUrl"] ?? "").toString().trim();
+        if (current.toLowerCase().startsWith("http")) continue;
+
+        final key = norm(org);
+        File? match;
+        for (final f in pdfs) {
+          final name = norm(f.path.split(Platform.pathSeparator).last);
+          if (name.startsWith(key)) {
+            match = f;
+            break;
+          }
+        }
+        match ??= () {
+          for (final f in pdfs) {
+            final name = norm(f.path.split(Platform.pathSeparator).last);
+            if (name.contains(key)) return f;
+          }
+          return null;
+        }();
+
+        if (match == null) {
+          missing.add(org);
+          continue;
+        }
+        await _setStatus(doc.id, {
+          "proofDocumentUrl": match.path.replaceAll('\\', '/'),
+        });
+        updated++;
+      }
+
+      msg = "Updated: $updated | File illa: "
+          "${missing.isEmpty ? "none" : missing.join(", ")}";
+    } catch (e) {
+      msg = "Fix failed: $e";
+    }
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), duration: const Duration(seconds: 8)),
+    );
   }
 
   /// users/{id} is what the app reads; sponsors/{id} is a mirror written at
